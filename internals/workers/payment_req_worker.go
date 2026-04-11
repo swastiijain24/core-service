@@ -15,9 +15,9 @@ type PaymentWorker struct {
 	transactionService services.TransactionService
 }
 
-func NewPaymentWorker(paymenrConsumer *kafka.Consumer, transactionService services.TransactionService) *PaymentWorker {
+func NewPaymentWorker(paymentConsumer *kafka.Consumer, transactionService services.TransactionService) *PaymentWorker {
 	return &PaymentWorker{
-		paymentConsumer: paymenrConsumer,
+		paymentConsumer: paymentConsumer,
 		transactionService: transactionService,
 	}
 }
