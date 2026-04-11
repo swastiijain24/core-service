@@ -1,36 +1,30 @@
 package main
 
 import (
-	"time"
+	"context"
+	"log"
+	"os"
 
-	"github.com/swastiijain24/core/internals/kafka"
-	"github.com/swastiijain24/core/internals/services"
-	"github.com/swastiijain24/npci-shared/constants"
+	"github.com/jackc/pgx/v5/pgxpool"
+	// "github.com/swastiijain24/core/internals/kafka"
 )
 
 func main() {
-	address := "localhost:9092"
-	brokers := []string{address}
 
-	producerA := kafka.NewProducer(address, constants.TopicBankInstruction)
-	defer producerA.Close()
-	producerB := kafka.NewProducer(address, constants.TopicPaymentResponse)
-	defer producerB.Close()
+	ctx := context.Background()
+	dsn := os.Getenv("GOOSE_DBSTRING")
 
-	consumerA := kafka.NewConsumer(brokers, constants.TopicBankOutcome)
-	defer consumerA.Close()
-	consumerB := kafka.NewConsumer(brokers, constants.TopicPaymentRequest)
-	defer consumerB.Close()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		panic(err)
+	}
+	defer pool.Close()
 
-	service := services.NewService(producerA, producerB, consumerA, consumerB)
+	log.Printf("connected to database")
 
-	time.Sleep(3 * time.Second)
+	// brokers:= []string {"localhost:9092"}
 
-	go service.ConsumeMsg()
-	go service.ProduceMsg()
-	go service.ConsumeMsg1()
-	go service.ProduceMsg1()
+	// reqConsumer := kafka.NewConsumer(brokers, "payment.request.v1")
 
-
-	select {}
+	// select {}
 }
