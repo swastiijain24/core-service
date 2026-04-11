@@ -21,59 +21,10 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type TransactionType int32
-
-const (
-	TransactionType_TXN_TYPE_UNKNOWN TransactionType = 0
-	TransactionType_TXN_TYPE_DEBIT   TransactionType = 1
-	TransactionType_TXN_TYPE_CREDIT  TransactionType = 2
-)
-
-// Enum value maps for TransactionType.
-var (
-	TransactionType_name = map[int32]string{
-		0: "TXN_TYPE_UNKNOWN",
-		1: "TXN_TYPE_DEBIT",
-		2: "TXN_TYPE_CREDIT",
-	}
-	TransactionType_value = map[string]int32{
-		"TXN_TYPE_UNKNOWN": 0,
-		"TXN_TYPE_DEBIT":   1,
-		"TXN_TYPE_CREDIT":  2,
-	}
-)
-
-func (x TransactionType) Enum() *TransactionType {
-	p := new(TransactionType)
-	*p = x
-	return p
-}
-
-func (x TransactionType) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (TransactionType) Descriptor() protoreflect.EnumDescriptor {
-	return file_pb_bank_proto_enumTypes[0].Descriptor()
-}
-
-func (TransactionType) Type() protoreflect.EnumType {
-	return &file_pb_bank_proto_enumTypes[0]
-}
-
-func (x TransactionType) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use TransactionType.Descriptor instead.
-func (TransactionType) EnumDescriptor() ([]byte, []int) {
-	return file_pb_bank_proto_rawDescGZIP(), []int{0}
-}
-
 type BankRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	TransactionId  string                 `protobuf:"bytes,1,opt,name=transaction_id,json=transactionId,proto3" json:"transaction_id,omitempty"`
-	Type           TransactionType        `protobuf:"varint,2,opt,name=type,proto3,enum=pb.TransactionType" json:"type,omitempty"`
+	Type           string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
 	PayerAccountId string                 `protobuf:"bytes,3,opt,name=payer_account_id,json=payerAccountId,proto3" json:"payer_account_id,omitempty"`
 	PayeeAccountId string                 `protobuf:"bytes,4,opt,name=payee_account_id,json=payeeAccountId,proto3" json:"payee_account_id,omitempty"`
 	Amount         int64                  `protobuf:"varint,5,opt,name=amount,proto3" json:"amount,omitempty"`
@@ -118,11 +69,11 @@ func (x *BankRequest) GetTransactionId() string {
 	return ""
 }
 
-func (x *BankRequest) GetType() TransactionType {
+func (x *BankRequest) GetType() string {
 	if x != nil {
 		return x.Type
 	}
-	return TransactionType_TXN_TYPE_UNKNOWN
+	return ""
 }
 
 func (x *BankRequest) GetPayerAccountId() string {
@@ -152,7 +103,7 @@ type BankResponse struct {
 	BankReferenceId string                 `protobuf:"bytes,2,opt,name=bank_reference_id,json=bankReferenceId,proto3" json:"bank_reference_id,omitempty"`
 	Success         bool                   `protobuf:"varint,3,opt,name=success,proto3" json:"success,omitempty"`
 	ErrorMessage    string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
-	Type            TransactionType        `protobuf:"varint,5,opt,name=type,proto3,enum=pb.TransactionType" json:"type,omitempty"`
+	Type            string                 `protobuf:"bytes,5,opt,name=type,proto3" json:"type,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -215,34 +166,30 @@ func (x *BankResponse) GetErrorMessage() string {
 	return ""
 }
 
-func (x *BankResponse) GetType() TransactionType {
+func (x *BankResponse) GetType() string {
 	if x != nil {
 		return x.Type
 	}
-	return TransactionType_TXN_TYPE_UNKNOWN
+	return ""
 }
 
 var File_pb_bank_proto protoreflect.FileDescriptor
 
 const file_pb_bank_proto_rawDesc = "" +
 	"\n" +
-	"\rpb/bank.proto\x12\x02pb\"\xc9\x01\n" +
+	"\rpb/bank.proto\x12\x02pb\"\xb4\x01\n" +
 	"\vBankRequest\x12%\n" +
-	"\x0etransaction_id\x18\x01 \x01(\tR\rtransactionId\x12'\n" +
-	"\x04type\x18\x02 \x01(\x0e2\x13.pb.TransactionTypeR\x04type\x12(\n" +
+	"\x0etransaction_id\x18\x01 \x01(\tR\rtransactionId\x12\x12\n" +
+	"\x04type\x18\x02 \x01(\tR\x04type\x12(\n" +
 	"\x10payer_account_id\x18\x03 \x01(\tR\x0epayerAccountId\x12(\n" +
 	"\x10payee_account_id\x18\x04 \x01(\tR\x0epayeeAccountId\x12\x16\n" +
-	"\x06amount\x18\x05 \x01(\x03R\x06amount\"\xc9\x01\n" +
+	"\x06amount\x18\x05 \x01(\x03R\x06amount\"\xb4\x01\n" +
 	"\fBankResponse\x12%\n" +
 	"\x0etransaction_id\x18\x01 \x01(\tR\rtransactionId\x12*\n" +
 	"\x11bank_reference_id\x18\x02 \x01(\tR\x0fbankReferenceId\x12\x18\n" +
 	"\asuccess\x18\x03 \x01(\bR\asuccess\x12#\n" +
-	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\x12'\n" +
-	"\x04type\x18\x05 \x01(\x0e2\x13.pb.TransactionTypeR\x04type*P\n" +
-	"\x0fTransactionType\x12\x14\n" +
-	"\x10TXN_TYPE_UNKNOWN\x10\x00\x12\x12\n" +
-	"\x0eTXN_TYPE_DEBIT\x10\x01\x12\x13\n" +
-	"\x0fTXN_TYPE_CREDIT\x10\x02B'Z%github.com/swastiijain24/contracts/pbb\x06proto3"
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\x12\x12\n" +
+	"\x04type\x18\x05 \x01(\tR\x04typeB'Z%github.com/swastiijain24/contracts/pbb\x06proto3"
 
 var (
 	file_pb_bank_proto_rawDescOnce sync.Once
@@ -256,21 +203,17 @@ func file_pb_bank_proto_rawDescGZIP() []byte {
 	return file_pb_bank_proto_rawDescData
 }
 
-var file_pb_bank_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_pb_bank_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_pb_bank_proto_goTypes = []any{
-	(TransactionType)(0), // 0: pb.TransactionType
-	(*BankRequest)(nil),  // 1: pb.BankRequest
-	(*BankResponse)(nil), // 2: pb.BankResponse
+	(*BankRequest)(nil),  // 0: pb.BankRequest
+	(*BankResponse)(nil), // 1: pb.BankResponse
 }
 var file_pb_bank_proto_depIdxs = []int32{
-	0, // 0: pb.BankRequest.type:type_name -> pb.TransactionType
-	0, // 1: pb.BankResponse.type:type_name -> pb.TransactionType
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	0, // [0:0] is the sub-list for method output_type
+	0, // [0:0] is the sub-list for method input_type
+	0, // [0:0] is the sub-list for extension type_name
+	0, // [0:0] is the sub-list for extension extendee
+	0, // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_pb_bank_proto_init() }
@@ -283,14 +226,13 @@ func file_pb_bank_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pb_bank_proto_rawDesc), len(file_pb_bank_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      0,
 			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_pb_bank_proto_goTypes,
 		DependencyIndexes: file_pb_bank_proto_depIdxs,
-		EnumInfos:         file_pb_bank_proto_enumTypes,
 		MessageInfos:      file_pb_bank_proto_msgTypes,
 	}.Build()
 	File_pb_bank_proto = out.File

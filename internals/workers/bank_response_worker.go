@@ -38,8 +38,8 @@ func (w *BankWorker) Start(ctx context.Context) {
 			continue
 		}
 
-		w.transactionService.ProcessBankResponse(ctx, bankResponse.GetTransactionId(), bankResponse.GetBankReferenceId(), bankResponse.GetSuccess(), bankResponse.GetErrorMessage())
+		w.transactionService.ProcessBankResponse(ctx, bankResponse.GetTransactionId(), bankResponse.GetBankReferenceId(), bankResponse.GetSuccess(), bankResponse.GetErrorMessage(), bankResponse.GetType())
 		
-		
+
 	}
 }

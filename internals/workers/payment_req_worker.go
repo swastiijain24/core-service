@@ -24,6 +24,7 @@ func NewPaymentWorker(paymentConsumer *kafka.Consumer, transactionService servic
 
 func (w *PaymentWorker) Start(ctx context.Context) {
 	for {
+		
 		msg, err := w.paymentConsumer.Reader.ReadMessage(ctx)
 		if err != nil {
 			break
