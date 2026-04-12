@@ -16,6 +16,7 @@ type Querier interface {
 	GetPendingOutboxEntries(ctx context.Context) ([]GetPendingOutboxEntriesRow, error)
 	GetTransaction(ctx context.Context, transactionID string) (Transaction, error)
 	IncrementRetryCount(ctx context.Context, transactionID string) error
+	UpdateOutboxStatus(ctx context.Context, arg UpdateOutboxStatusParams) error
 	UpdateTransactionStatus(ctx context.Context, arg UpdateTransactionStatusParams) (int64, error)
 }
 

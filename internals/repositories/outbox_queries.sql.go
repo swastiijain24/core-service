@@ -82,3 +82,20 @@ func (q *Queries) GetPendingOutboxEntries(ctx context.Context) ([]GetPendingOutb
 	}
 	return items, nil
 }
+
+const updateOutboxStatus = `-- name: UpdateOutboxStatus :exec
+UPDATE outbox
+SET status = $2
+WHERE transaction_id = $1 
+  AND status != $2
+`
+
+type UpdateOutboxStatusParams struct {
+	TransactionID string `json:"transaction_id"`
+	Status        string `json:"status"`
+}
+
+func (q *Queries) UpdateOutboxStatus(ctx context.Context, arg UpdateOutboxStatusParams) error {
+	_, err := q.db.Exec(ctx, updateOutboxStatus, arg.TransactionID, arg.Status)
+	return err
+}

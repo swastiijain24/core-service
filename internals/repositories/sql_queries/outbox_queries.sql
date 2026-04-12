@@ -22,3 +22,9 @@ WHERE status = 'PENDING'
 ORDER BY created_at ASC
 LIMIT 100
 FOR UPDATE SKIP LOCKED;
+
+-- name: UpdateOutboxStatus :exec
+UPDATE outbox
+SET status = $2
+WHERE transaction_id = $1 
+  AND status != $2;
