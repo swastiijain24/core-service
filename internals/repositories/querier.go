@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	CleanupOutbox(ctx context.Context) error
 	CreateOutboxEntry(ctx context.Context, arg CreateOutboxEntryParams) (pgconn.CommandTag, error)
 	CreateTransaction(ctx context.Context, arg CreateTransactionParams) (pgconn.CommandTag, error)
 	GetPendingOutboxEntries(ctx context.Context) ([]GetPendingOutboxEntriesRow, error)

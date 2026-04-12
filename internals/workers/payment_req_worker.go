@@ -22,7 +22,7 @@ func NewPaymentWorker(paymentConsumer *kafka.Consumer, transactionService servic
 	}
 }
 
-func (w *PaymentWorker) Start(ctx context.Context) {
+func (w *PaymentWorker) StartConsumingPaymentRequest(ctx context.Context) {
 	for {
 		
 		msg, err := w.paymentConsumer.Reader.ReadMessage(ctx)

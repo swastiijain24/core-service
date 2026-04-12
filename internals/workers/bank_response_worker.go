@@ -22,7 +22,7 @@ func NewBankWorker(bankConsumer *kafka.Consumer, transactionService services.Tra
 	}
 }
 
-func (w *BankWorker) Start(ctx context.Context) {
+func (w *BankWorker) StartConsumingBankResponse(ctx context.Context) {
 
 	for {
 		msg, err := w.bankConsumer.Reader.ReadMessage(ctx)

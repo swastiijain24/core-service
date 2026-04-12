@@ -28,3 +28,8 @@ UPDATE outbox
 SET status = $2
 WHERE transaction_id = $1 
   AND status != $2;
+
+-- name: CleanupOutbox :exec
+DELETE FROM outbox 
+WHERE status = 'SENT' 
+AND created_at < NOW() - INTERVAL '24 hours';

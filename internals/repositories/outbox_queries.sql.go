@@ -12,6 +12,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const cleanupOutbox = `-- name: CleanupOutbox :exec
+DELETE FROM outbox 
+WHERE status = 'SENT' 
+AND created_at < NOW() - INTERVAL '24 hours'
+`
+
+func (q *Queries) CleanupOutbox(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, cleanupOutbox)
+	return err
+}
+
 const createOutboxEntry = `-- name: CreateOutboxEntry :execresult
 INSERT INTO outbox (
     transaction_id, 

@@ -21,7 +21,7 @@ func NewRelayWorker(repo repo.Querier, producer *kafka.Producer) *RelayWorker {
 	}
 }
 
-func (w *RelayWorker) Start(ctx context.Context) {
+func (w *RelayWorker) StartRelayingOutboxEntries(ctx context.Context) {
 
 	//polling every 200ms for low latency recovery
 	ticker := time.NewTicker(200 * time.Millisecond)
@@ -61,9 +61,30 @@ func (w *RelayWorker) processOutbox(ctx context.Context){
 			TransactionID: entry.TransactionID,
 			Status: "SENT",
 		})
-		
+
 		if err != nil {
 			log.Printf("Relay: failed to update status for %s: %v", entry.TransactionID, err)
 		}
 	}
 }
+
+func (w *RelayWorker) StartCleanupOutbox(ctx context.Context){
+	ticker := time.NewTicker(10 * time.Hour)
+	defer ticker.Stop()
+
+	for {
+		select{
+		case <-ctx.Done(): 
+		return 
+		case <-ticker.C	:
+			err := w.repo.CleanupOutbox(ctx)
+			if err != nil{
+				log.Printf("Cleanup: failed to prune outbox: %v", err)
+            } else {
+                log.Println("Cleanup: successfully pruned old SENT entries")
+            }
+			}
+		}
+	}
+
+
