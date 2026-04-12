@@ -8,6 +8,14 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Outbox struct {
+	TransactionID string             `json:"transaction_id"`
+	Topic         string             `json:"topic"`
+	Payload       []byte             `json:"payload"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	Status        string             `json:"status"`
+}
+
 type Transaction struct {
 	TransactionID   string             `json:"transaction_id"`
 	PayerAccountID  string             `json:"payer_account_id"`
