@@ -115,12 +115,12 @@ func (s *txnsvc) ProcessBankResponse(ctx context.Context, transactionId string, 
 
 func (s *txnsvc) handleCreditFailure(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) {
 
-	if transaction.RetryCount < 3 {
+	if transaction.RetryCount.Int32 < 3 {
 		qtx.UpdateTransactionStatus(ctx, repo.UpdateTransactionStatusParams{
 			TransactionID: transaction.TransactionID,
 			Status:        "CREDIT_PENDING",
 		})
-		s.repo.IncrementRetryCount(ctx, transaction.TransactionID)
+		qtx.IncrementRetryCount(ctx, transaction.TransactionID)
 
 		retryReq := &pb.BankRequest{
 			TransactionId:  transaction.TransactionID,
@@ -132,7 +132,7 @@ func (s *txnsvc) handleCreditFailure(ctx context.Context, qtx repo.Querier, tran
 
 		payload, _ := proto.Marshal(retryReq)
 
-		s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_RETRY"+ fmt.Sprintf("%d", transaction.RetryCount), transaction.TransactionID, "bank.instruction.v1", payload)
+		s.pushToOutBox(ctx, qtx, transaction.TransactionID + "_RETRY" + fmt.Sprintf("%d", transaction.RetryCount.Int32 +1), transaction.TransactionID, "bank.instruction.v1", payload)
 
 		return
 	}
@@ -159,7 +159,7 @@ func (s *txnsvc) handleCreditFailure(ctx context.Context, qtx repo.Querier, tran
 func (s *txnsvc) handleDebitFailure(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) {
 	qtx.UpdateTransactionStatus(ctx, repo.UpdateTransactionStatusParams{
 		TransactionID:   transaction.TransactionID,
-		BankReferenceID: transaction.BankReferenceID,
+		BankReferenceID: utils.ToPGText(bankReferenceId),
 		Status:          "DEBIT_FAILED",
 	})
 

@@ -17,8 +17,9 @@ type Querier interface {
 	GetPendingOutboxEntries(ctx context.Context) ([]Outbox, error)
 	GetTransaction(ctx context.Context, transactionID string) (Transaction, error)
 	IncrementRetryCount(ctx context.Context, transactionID string) error
+	UpdateCreditLeg(ctx context.Context, arg UpdateCreditLegParams) (int64, error)
+	UpdateDebitLeg(ctx context.Context, arg UpdateDebitLegParams) (int64, error)
 	UpdateOutboxStatus(ctx context.Context, arg UpdateOutboxStatusParams) error
-	UpdateTransactionStatus(ctx context.Context, arg UpdateTransactionStatusParams) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

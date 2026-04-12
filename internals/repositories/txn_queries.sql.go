@@ -18,18 +18,22 @@ INSERT INTO transactions (
     payer_account_id, 
     payee_account_id, 
     amount, 
-    status
+    status,
+    payer_bank_code,
+    payee_bank_code
 ) VALUES (
-    $1, $2, $3, $4, $5
+    $1, $2, $3, $4, $5, $6, $7
 ) ON CONFLICT (transaction_id) DO NOTHING
 `
 
 type CreateTransactionParams struct {
-	TransactionID  string `json:"transaction_id"`
-	PayerAccountID string `json:"payer_account_id"`
-	PayeeAccountID string `json:"payee_account_id"`
-	Amount         int64  `json:"amount"`
-	Status         string `json:"status"`
+	TransactionID  string      `json:"transaction_id"`
+	PayerAccountID string      `json:"payer_account_id"`
+	PayeeAccountID string      `json:"payee_account_id"`
+	Amount         int64       `json:"amount"`
+	Status         string      `json:"status"`
+	PayerBankCode  pgtype.Text `json:"payer_bank_code"`
+	PayeeBankCode  pgtype.Text `json:"payee_bank_code"`
 }
 
 func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionParams) (pgconn.CommandTag, error) {
@@ -39,11 +43,13 @@ func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionPa
 		arg.PayeeAccountID,
 		arg.Amount,
 		arg.Status,
+		arg.PayerBankCode,
+		arg.PayeeBankCode,
 	)
 }
 
 const getTransaction = `-- name: GetTransaction :one
-SELECT transaction_id, payer_account_id, payee_account_id, amount, status, retry_count, bank_reference_id, failure_reason, created_at, updated_at FROM transactions
+SELECT transaction_id, payer_account_id, payee_account_id, amount, status, retry_count, debit_bank_ref, failure_reason, created_at, updated_at, credit_bank_ref, payer_bank_code, payee_bank_code FROM transactions
 WHERE transaction_id = $1 LIMIT 1
 `
 
@@ -57,10 +63,13 @@ func (q *Queries) GetTransaction(ctx context.Context, transactionID string) (Tra
 		&i.Amount,
 		&i.Status,
 		&i.RetryCount,
-		&i.BankReferenceID,
+		&i.DebitBankRef,
 		&i.FailureReason,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CreditBankRef,
+		&i.PayerBankCode,
+		&i.PayeeBankCode,
 	)
 	return i, err
 }
@@ -78,28 +87,58 @@ func (q *Queries) IncrementRetryCount(ctx context.Context, transactionID string)
 	return err
 }
 
-const updateTransactionStatus = `-- name: UpdateTransactionStatus :execrows
+const updateCreditLeg = `-- name: UpdateCreditLeg :execrows
 UPDATE transactions 
 SET 
     status = $2, 
-    bank_reference_id = COALESCE($3, bank_reference_id),
+    credit_bank_ref = COALESCE($3, credit_bank_ref),
     failure_reason = COALESCE($4, failure_reason),
     updated_at = NOW()
 WHERE transaction_id = $1
 `
 
-type UpdateTransactionStatusParams struct {
-	TransactionID   string      `json:"transaction_id"`
-	Status          string      `json:"status"`
-	BankReferenceID pgtype.Text `json:"bank_reference_id"`
-	FailureReason   pgtype.Text `json:"failure_reason"`
+type UpdateCreditLegParams struct {
+	TransactionID string      `json:"transaction_id"`
+	Status        string      `json:"status"`
+	CreditBankRef pgtype.Text `json:"credit_bank_ref"`
+	FailureReason pgtype.Text `json:"failure_reason"`
 }
 
-func (q *Queries) UpdateTransactionStatus(ctx context.Context, arg UpdateTransactionStatusParams) (int64, error) {
-	result, err := q.db.Exec(ctx, updateTransactionStatus,
+func (q *Queries) UpdateCreditLeg(ctx context.Context, arg UpdateCreditLegParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateCreditLeg,
 		arg.TransactionID,
 		arg.Status,
-		arg.BankReferenceID,
+		arg.CreditBankRef,
+		arg.FailureReason,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateDebitLeg = `-- name: UpdateDebitLeg :execrows
+UPDATE transactions 
+SET 
+    status = $2, 
+    debit_bank_ref = COALESCE($3, debit_bank_ref),
+    failure_reason = COALESCE($4, failure_reason),
+    updated_at = NOW()
+WHERE transaction_id = $1
+`
+
+type UpdateDebitLegParams struct {
+	TransactionID string      `json:"transaction_id"`
+	Status        string      `json:"status"`
+	DebitBankRef  pgtype.Text `json:"debit_bank_ref"`
+	FailureReason pgtype.Text `json:"failure_reason"`
+}
+
+func (q *Queries) UpdateDebitLeg(ctx context.Context, arg UpdateDebitLegParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateDebitLeg,
+		arg.TransactionID,
+		arg.Status,
+		arg.DebitBankRef,
 		arg.FailureReason,
 	)
 	if err != nil {

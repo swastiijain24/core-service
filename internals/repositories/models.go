@@ -18,14 +18,17 @@ type Outbox struct {
 }
 
 type Transaction struct {
-	TransactionID   string             `json:"transaction_id"`
-	PayerAccountID  string             `json:"payer_account_id"`
-	PayeeAccountID  string             `json:"payee_account_id"`
-	Amount          int64              `json:"amount"`
-	Status          string             `json:"status"`
-	RetryCount      pgtype.Int4        `json:"retry_count"`
-	BankReferenceID pgtype.Text        `json:"bank_reference_id"`
-	FailureReason   pgtype.Text        `json:"failure_reason"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	TransactionID  string             `json:"transaction_id"`
+	PayerAccountID string             `json:"payer_account_id"`
+	PayeeAccountID string             `json:"payee_account_id"`
+	Amount         int64              `json:"amount"`
+	Status         string             `json:"status"`
+	RetryCount     pgtype.Int4        `json:"retry_count"`
+	DebitBankRef   pgtype.Text        `json:"debit_bank_ref"`
+	FailureReason  pgtype.Text        `json:"failure_reason"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	CreditBankRef  pgtype.Text        `json:"credit_bank_ref"`
+	PayerBankCode  pgtype.Text        `json:"payer_bank_code"`
+	PayeeBankCode  pgtype.Text        `json:"payee_bank_code"`
 }

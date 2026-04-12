@@ -4,16 +4,27 @@ INSERT INTO transactions (
     payer_account_id, 
     payee_account_id, 
     amount, 
-    status
+    status,
+    payer_bank_code,
+    payee_bank_code
 ) VALUES (
-    $1, $2, $3, $4, $5
+    $1, $2, $3, $4, $5, $6, $7
 ) ON CONFLICT (transaction_id) DO NOTHING;
 
--- name: UpdateTransactionStatus :execrows
+-- name: UpdateDebitLeg :execrows
 UPDATE transactions 
 SET 
     status = $2, 
-    bank_reference_id = COALESCE($3, bank_reference_id),
+    debit_bank_ref = COALESCE($3, debit_bank_ref),
+    failure_reason = COALESCE($4, failure_reason),
+    updated_at = NOW()
+WHERE transaction_id = $1;
+
+-- name: UpdateCreditLeg :execrows
+UPDATE transactions 
+SET 
+    status = $2, 
+    credit_bank_ref = COALESCE($3, credit_bank_ref),
     failure_reason = COALESCE($4, failure_reason),
     updated_at = NOW()
 WHERE transaction_id = $1;
