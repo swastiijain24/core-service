@@ -24,10 +24,11 @@ const (
 type BankRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	TransactionId  string                 `protobuf:"bytes,1,opt,name=transaction_id,json=transactionId,proto3" json:"transaction_id,omitempty"`
-	Type           string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
-	PayerAccountId string                 `protobuf:"bytes,3,opt,name=payer_account_id,json=payerAccountId,proto3" json:"payer_account_id,omitempty"`
-	PayeeAccountId string                 `protobuf:"bytes,4,opt,name=payee_account_id,json=payeeAccountId,proto3" json:"payee_account_id,omitempty"`
-	Amount         int64                  `protobuf:"varint,5,opt,name=amount,proto3" json:"amount,omitempty"`
+	PayerAccountId string                 `protobuf:"bytes,2,opt,name=payer_account_id,json=payerAccountId,proto3" json:"payer_account_id,omitempty"`
+	PayeeAccountId string                 `protobuf:"bytes,3,opt,name=payee_account_id,json=payeeAccountId,proto3" json:"payee_account_id,omitempty"`
+	Amount         int64                  `protobuf:"varint,4,opt,name=amount,proto3" json:"amount,omitempty"`
+	Type           string                 `protobuf:"bytes,5,opt,name=type,proto3" json:"type,omitempty"`
+	BankCode       string                 `protobuf:"bytes,6,opt,name=bank_code,json=bankCode,proto3" json:"bank_code,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -69,13 +70,6 @@ func (x *BankRequest) GetTransactionId() string {
 	return ""
 }
 
-func (x *BankRequest) GetType() string {
-	if x != nil {
-		return x.Type
-	}
-	return ""
-}
-
 func (x *BankRequest) GetPayerAccountId() string {
 	if x != nil {
 		return x.PayerAccountId
@@ -95,6 +89,20 @@ func (x *BankRequest) GetAmount() int64 {
 		return x.Amount
 	}
 	return 0
+}
+
+func (x *BankRequest) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *BankRequest) GetBankCode() string {
+	if x != nil {
+		return x.BankCode
+	}
+	return ""
 }
 
 type BankResponse struct {
@@ -177,13 +185,14 @@ var File_pb_bank_proto protoreflect.FileDescriptor
 
 const file_pb_bank_proto_rawDesc = "" +
 	"\n" +
-	"\rpb/bank.proto\x12\x02pb\"\xb4\x01\n" +
+	"\rpb/bank.proto\x12\x02pb\"\xd1\x01\n" +
 	"\vBankRequest\x12%\n" +
-	"\x0etransaction_id\x18\x01 \x01(\tR\rtransactionId\x12\x12\n" +
-	"\x04type\x18\x02 \x01(\tR\x04type\x12(\n" +
-	"\x10payer_account_id\x18\x03 \x01(\tR\x0epayerAccountId\x12(\n" +
-	"\x10payee_account_id\x18\x04 \x01(\tR\x0epayeeAccountId\x12\x16\n" +
-	"\x06amount\x18\x05 \x01(\x03R\x06amount\"\xb4\x01\n" +
+	"\x0etransaction_id\x18\x01 \x01(\tR\rtransactionId\x12(\n" +
+	"\x10payer_account_id\x18\x02 \x01(\tR\x0epayerAccountId\x12(\n" +
+	"\x10payee_account_id\x18\x03 \x01(\tR\x0epayeeAccountId\x12\x16\n" +
+	"\x06amount\x18\x04 \x01(\x03R\x06amount\x12\x12\n" +
+	"\x04type\x18\x05 \x01(\tR\x04type\x12\x1b\n" +
+	"\tbank_code\x18\x06 \x01(\tR\bbankCode\"\xb4\x01\n" +
 	"\fBankResponse\x12%\n" +
 	"\x0etransaction_id\x18\x01 \x01(\tR\rtransactionId\x12*\n" +
 	"\x11bank_reference_id\x18\x02 \x01(\tR\x0fbankReferenceId\x12\x18\n" +

@@ -2,10 +2,10 @@ package workers
 
 import (
 	"context"
-	"fmt"
+	"log"
 
-	pb "github.com/swastiijain24/core/internals/gen"
 	"github.com/swastiijain24/core/internals/kafka"
+	pb "github.com/swastiijain24/core/internals/pb"
 	"github.com/swastiijain24/core/internals/services"
 	"google.golang.org/protobuf/proto"
 )
@@ -25,7 +25,7 @@ func NewBankWorker(bankConsumer *kafka.Consumer, transactionService services.Tra
 func (w *BankWorker) StartConsumingBankResponse(ctx context.Context) {
 
 	for {
-		msg, err := w.bankConsumer.Reader.ReadMessage(ctx)
+		msg, err := w.bankConsumer.Reader.FetchMessage(ctx)
 		if err!= nil{
 			break 
 		}
@@ -34,12 +34,16 @@ func (w *BankWorker) StartConsumingBankResponse(ctx context.Context) {
 
 		err = proto.Unmarshal(msg.Value, &bankResponse)
 		if err!= nil{
-			fmt.Println("error unpacking message:", err)
+			log.Println("error unpacking message: %v", err)
 			continue
 		}
 
-		w.transactionService.ProcessBankResponse(ctx, bankResponse.GetTransactionId(), bankResponse.GetBankReferenceId(), bankResponse.GetSuccess(), bankResponse.GetErrorMessage(), bankResponse.GetType())
+		err = w.transactionService.ProcessBankResponse(ctx, bankResponse.GetTransactionId(), bankResponse.GetBankReferenceId(), bankResponse.GetSuccess(), bankResponse.GetErrorMessage(), bankResponse.GetType())
+		log.Printf("failed to process bank reponse :%v", err)
 		
+		if err := w.bankConsumer.Reader.CommitMessages(ctx, msg); err != nil {
+                log.Printf("failed to commit: %v", err)
+            }
 
 	}
 }

@@ -22,13 +22,15 @@ const (
 )
 
 type PaymentResponse struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	TransactionId   string                 `protobuf:"bytes,1,opt,name=transaction_id,json=transactionId,proto3" json:"transaction_id,omitempty"`
-	Status          string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
-	BankReferenceId string                 `protobuf:"bytes,3,opt,name=bank_reference_id,json=bankReferenceId,proto3" json:"bank_reference_id,omitempty"`
-	CompletedAt     string                 `protobuf:"bytes,5,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TransactionId string                 `protobuf:"bytes,1,opt,name=transaction_id,json=transactionId,proto3" json:"transaction_id,omitempty"`
+	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	DebitBankRef  string                 `protobuf:"bytes,3,opt,name=debit_bank_ref,json=debitBankRef,proto3" json:"debit_bank_ref,omitempty"`
+	CreditBankRef string                 `protobuf:"bytes,4,opt,name=credit_bank_ref,json=creditBankRef,proto3" json:"credit_bank_ref,omitempty"`
+	FailureReason string                 `protobuf:"bytes,5,opt,name=failure_reason,json=failureReason,proto3" json:"failure_reason,omitempty"`
+	CompletedAt   string                 `protobuf:"bytes,6,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PaymentResponse) Reset() {
@@ -75,9 +77,23 @@ func (x *PaymentResponse) GetStatus() string {
 	return ""
 }
 
-func (x *PaymentResponse) GetBankReferenceId() string {
+func (x *PaymentResponse) GetDebitBankRef() string {
 	if x != nil {
-		return x.BankReferenceId
+		return x.DebitBankRef
+	}
+	return ""
+}
+
+func (x *PaymentResponse) GetCreditBankRef() string {
+	if x != nil {
+		return x.CreditBankRef
+	}
+	return ""
+}
+
+func (x *PaymentResponse) GetFailureReason() string {
+	if x != nil {
+		return x.FailureReason
 	}
 	return ""
 }
@@ -93,12 +109,14 @@ var File_pb_payment_response_proto protoreflect.FileDescriptor
 
 const file_pb_payment_response_proto_rawDesc = "" +
 	"\n" +
-	"\x19pb/payment_response.proto\x12\x02pb\"\x9f\x01\n" +
+	"\x19pb/payment_response.proto\x12\x02pb\"\xe8\x01\n" +
 	"\x0fPaymentResponse\x12%\n" +
 	"\x0etransaction_id\x18\x01 \x01(\tR\rtransactionId\x12\x16\n" +
-	"\x06status\x18\x02 \x01(\tR\x06status\x12*\n" +
-	"\x11bank_reference_id\x18\x03 \x01(\tR\x0fbankReferenceId\x12!\n" +
-	"\fcompleted_at\x18\x05 \x01(\tR\vcompletedAtB'Z%github.com/swastiijain24/contracts/pbb\x06proto3"
+	"\x06status\x18\x02 \x01(\tR\x06status\x12$\n" +
+	"\x0edebit_bank_ref\x18\x03 \x01(\tR\fdebitBankRef\x12&\n" +
+	"\x0fcredit_bank_ref\x18\x04 \x01(\tR\rcreditBankRef\x12%\n" +
+	"\x0efailure_reason\x18\x05 \x01(\tR\rfailureReason\x12!\n" +
+	"\fcompleted_at\x18\x06 \x01(\tR\vcompletedAtB'Z%github.com/swastiijain24/contracts/pbb\x06proto3"
 
 var (
 	file_pb_payment_response_proto_rawDescOnce sync.Once
