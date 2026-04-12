@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	pb "github.com/swastiijain24/core/internals/gen"
@@ -18,7 +19,7 @@ type TransactionService interface {
 	handleCreditSuccess(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string)
 	handleDebitFailure(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string)
 	handleDebitSuccess(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string)
-	pushToOutBox(ctx context.Context, qtx repo.Querier, transactionId string, topic string, payload []byte)
+	pushToOutBox(ctx context.Context, qtx repo.Querier, outboxKey string, transactionId string, topic string, payload []byte)
 }
 
 type txnsvc struct {
@@ -69,7 +70,7 @@ func (s *txnsvc) NewTransaction(ctx context.Context, transactionId string, payer
 		return //err
 	}
 
-	s.pushToOutBox(ctx, qtx, transactionId, "bank.instruction.v1", payload)
+	s.pushToOutBox(ctx, qtx,transactionId, transactionId, "bank.instruction.v1", payload)
 
 	dbTx.Commit(ctx)
 
@@ -125,13 +126,13 @@ func (s *txnsvc) handleCreditFailure(ctx context.Context, qtx repo.Querier, tran
 			TransactionId:  transaction.TransactionID,
 			Type:           "CREDIT",
 			PayerAccountId: transaction.PayerAccountID,
-			PayeeAccountId: transaction.PayeeAccountID, // will have to swap them
+			PayeeAccountId: transaction.PayeeAccountID, 
 			Amount:         transaction.Amount,
 		}
 
 		payload, _ := proto.Marshal(retryReq)
 
-		s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_RETRY"+string(transaction.RetryCount.Int32), "bank.instruction.v1", payload)
+		s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_RETRY"+ fmt.Sprintf("%d", transaction.RetryCount), transaction.TransactionID, "bank.instruction.v1", payload)
 
 		return
 	}
@@ -152,7 +153,7 @@ func (s *txnsvc) handleCreditFailure(ctx context.Context, qtx repo.Querier, tran
 
 	payload, _ := proto.Marshal(refundReq)
 
-	s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_REFUND", "bank.instruction.v1", payload)
+	s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_REFUND", transaction.TransactionID, "bank.instruction.v1", payload)
 }
 
 func (s *txnsvc) handleDebitFailure(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) {
@@ -170,7 +171,7 @@ func (s *txnsvc) handleDebitFailure(ctx context.Context, qtx repo.Querier, trans
 
 	payload, _ := proto.Marshal(finalResponse)
 
-	s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_FINAL", "payment.response.v1", payload)
+	s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_FINAL", transaction.TransactionID, "payment.response.v1", payload)
 
 }
 
@@ -192,7 +193,7 @@ func (s *txnsvc) handleDebitSuccess(ctx context.Context, qtx repo.Querier, trans
 
 	payload, _ := proto.Marshal(creditReq)
 
-	s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_CREDIT", "bank.instruction.v1", payload)
+	s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_CREDIT", transaction.TransactionID, "bank.instruction.v1", payload)
 
 }
 
@@ -211,12 +212,13 @@ func (s *txnsvc) handleCreditSuccess(ctx context.Context, qtx repo.Querier, tran
 
 	payload, _ := proto.Marshal(finalResponse)
 
-	s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_FINAL", "payment.response.v1", payload)
+	s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_FINAL", transaction.TransactionID, "payment.response.v1", payload)
 
 }
 
-func (s *txnsvc) pushToOutBox(ctx context.Context, qtx repo.Querier, transactionId string, topic string, payload []byte) {
+func (s *txnsvc) pushToOutBox(ctx context.Context, qtx repo.Querier, outboxKey string,  transactionId string, topic string, payload []byte) {
 	qtx.CreateOutboxEntry(ctx, repo.CreateOutboxEntryParams{
+		OutboxKey: outboxKey,
 		TransactionID: transactionId,
 		Topic:         topic,
 		Payload:       payload,

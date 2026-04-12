@@ -58,7 +58,7 @@ func (w *RelayWorker) processOutbox(ctx context.Context){
 		}
 
 		err = w.repo.UpdateOutboxStatus(ctx, repo.UpdateOutboxStatusParams{
-			TransactionID: entry.TransactionID,
+			OutboxKey: entry.OutboxKey,
 			Status: "SENT",
 		})
 

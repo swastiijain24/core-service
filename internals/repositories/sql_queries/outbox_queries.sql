@@ -1,17 +1,19 @@
 -- name: CreateOutboxEntry :execresult
 INSERT INTO outbox (
+    outbox_key, 
     transaction_id, 
     topic, 
     payload, 
     status
 ) VALUES (
-    $1, $2, $3, 'PENDING'
+    $1, $2, $3, $4, 'PENDING'
 ) 
-ON CONFLICT (txn_id) 
+ON CONFLICT (outbox_key) 
 DO NOTHING;
 
 -- name: GetPendingOutboxEntries :many
 SELECT 
+    outbox_key,
     transaction_id, 
     topic, 
     payload, 
@@ -25,8 +27,9 @@ FOR UPDATE SKIP LOCKED;
 
 -- name: UpdateOutboxStatus :exec
 UPDATE outbox
-SET status = $2
-WHERE transaction_id = $1 
+SET status = $2,
+    updated_at = NOW()
+WHERE outbox_key = $1 
   AND status != $2;
 
 -- name: CleanupOutbox :exec

@@ -14,7 +14,7 @@ type Querier interface {
 	CleanupOutbox(ctx context.Context) error
 	CreateOutboxEntry(ctx context.Context, arg CreateOutboxEntryParams) (pgconn.CommandTag, error)
 	CreateTransaction(ctx context.Context, arg CreateTransactionParams) (pgconn.CommandTag, error)
-	GetPendingOutboxEntries(ctx context.Context) ([]GetPendingOutboxEntriesRow, error)
+	GetPendingOutboxEntries(ctx context.Context) ([]Outbox, error)
 	GetTransaction(ctx context.Context, transactionID string) (Transaction, error)
 	IncrementRetryCount(ctx context.Context, transactionID string) error
 	UpdateOutboxStatus(ctx context.Context, arg UpdateOutboxStatusParams) error

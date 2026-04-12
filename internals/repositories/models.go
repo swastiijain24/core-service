@@ -9,11 +9,12 @@ import (
 )
 
 type Outbox struct {
+	OutboxKey     string             `json:"outbox_key"`
 	TransactionID string             `json:"transaction_id"`
 	Topic         string             `json:"topic"`
 	Payload       []byte             `json:"payload"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	Status        string             `json:"status"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 }
 
 type Transaction struct {

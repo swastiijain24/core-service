@@ -9,7 +9,6 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const cleanupOutbox = `-- name: CleanupOutbox :exec
@@ -25,29 +24,37 @@ func (q *Queries) CleanupOutbox(ctx context.Context) error {
 
 const createOutboxEntry = `-- name: CreateOutboxEntry :execresult
 INSERT INTO outbox (
+    outbox_key, 
     transaction_id, 
     topic, 
     payload, 
     status
 ) VALUES (
-    $1, $2, $3, 'PENDING'
+    $1, $2, $3, $4, 'PENDING'
 ) 
-ON CONFLICT (txn_id) 
+ON CONFLICT (outbox_key) 
 DO NOTHING
 `
 
 type CreateOutboxEntryParams struct {
+	OutboxKey     string `json:"outbox_key"`
 	TransactionID string `json:"transaction_id"`
 	Topic         string `json:"topic"`
 	Payload       []byte `json:"payload"`
 }
 
 func (q *Queries) CreateOutboxEntry(ctx context.Context, arg CreateOutboxEntryParams) (pgconn.CommandTag, error) {
-	return q.db.Exec(ctx, createOutboxEntry, arg.TransactionID, arg.Topic, arg.Payload)
+	return q.db.Exec(ctx, createOutboxEntry,
+		arg.OutboxKey,
+		arg.TransactionID,
+		arg.Topic,
+		arg.Payload,
+	)
 }
 
 const getPendingOutboxEntries = `-- name: GetPendingOutboxEntries :many
 SELECT 
+    outbox_key,
     transaction_id, 
     topic, 
     payload, 
@@ -60,24 +67,17 @@ LIMIT 100
 FOR UPDATE SKIP LOCKED
 `
 
-type GetPendingOutboxEntriesRow struct {
-	TransactionID string             `json:"transaction_id"`
-	Topic         string             `json:"topic"`
-	Payload       []byte             `json:"payload"`
-	Status        string             `json:"status"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-}
-
-func (q *Queries) GetPendingOutboxEntries(ctx context.Context) ([]GetPendingOutboxEntriesRow, error) {
+func (q *Queries) GetPendingOutboxEntries(ctx context.Context) ([]Outbox, error) {
 	rows, err := q.db.Query(ctx, getPendingOutboxEntries)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetPendingOutboxEntriesRow
+	var items []Outbox
 	for rows.Next() {
-		var i GetPendingOutboxEntriesRow
+		var i Outbox
 		if err := rows.Scan(
+			&i.OutboxKey,
 			&i.TransactionID,
 			&i.Topic,
 			&i.Payload,
@@ -96,17 +96,18 @@ func (q *Queries) GetPendingOutboxEntries(ctx context.Context) ([]GetPendingOutb
 
 const updateOutboxStatus = `-- name: UpdateOutboxStatus :exec
 UPDATE outbox
-SET status = $2
-WHERE transaction_id = $1 
+SET status = $2,
+    updated_at = NOW()
+WHERE outbox_key = $1 
   AND status != $2
 `
 
 type UpdateOutboxStatusParams struct {
-	TransactionID string `json:"transaction_id"`
-	Status        string `json:"status"`
+	OutboxKey string `json:"outbox_key"`
+	Status    string `json:"status"`
 }
 
 func (q *Queries) UpdateOutboxStatus(ctx context.Context, arg UpdateOutboxStatusParams) error {
-	_, err := q.db.Exec(ctx, updateOutboxStatus, arg.TransactionID, arg.Status)
+	_, err := q.db.Exec(ctx, updateOutboxStatus, arg.OutboxKey, arg.Status)
 	return err
 }
