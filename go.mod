@@ -4,6 +4,7 @@ go 1.26.1
 
 require (
 	github.com/jackc/pgx/v5 v5.9.1
+	github.com/joho/godotenv v1.5.1
 	github.com/segmentio/kafka-go v0.4.50
 	google.golang.org/protobuf v1.36.11
 )

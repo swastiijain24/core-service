@@ -3,6 +3,7 @@ package workers
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/swastiijain24/core/internals/kafka"
 	pb "github.com/swastiijain24/core/internals/pb"
@@ -25,6 +26,7 @@ func NewPaymentWorker(paymentConsumer *kafka.Consumer, transactionService servic
 func (w *PaymentWorker) StartConsumingPaymentRequest(ctx context.Context) {
 	for {
 
+
 		msg, err := w.paymentConsumer.Reader.FetchMessage(ctx)
 		if err != nil {
 			fmt.Println("error fetching message:", err)
@@ -38,7 +40,7 @@ func (w *PaymentWorker) StartConsumingPaymentRequest(ctx context.Context) {
 			fmt.Println("error unpacking message:", err)
 			continue
 		}
-
+		log.Print("5")
 		err = w.transactionService.NewTransaction(ctx, payment.GetTransactionId(), payment.GetPayerAccountId(), payment.GetPayeeAccountId(), payment.GetAmount(), payment.GetPayerBankCode(), payment.GetPayeeBankCode())
 		if err != nil {
 			fmt.Println("error starting transaction:", err)
@@ -47,6 +49,6 @@ func (w *PaymentWorker) StartConsumingPaymentRequest(ctx context.Context) {
 		if err := w.paymentConsumer.Reader.CommitMessages(ctx, msg); err != nil {
 			fmt.Println("failed to commit message:", err)
 		}
-
+		log.Print("7")
 	}
 }

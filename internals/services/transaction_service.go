@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/swastiijain24/core/internals/kafka"
@@ -76,7 +77,7 @@ func (s *txnsvc) NewTransaction(ctx context.Context, transactionId string, payer
 	if err != nil {
 		return fmt.Errorf("error pushing message to outbox: %w", err)
 	}
-
+	log.Print("6")
 	dbTx.Commit(ctx)
 
 	return nil 

@@ -27,8 +27,7 @@ FOR UPDATE SKIP LOCKED;
 
 -- name: UpdateOutboxStatus :exec
 UPDATE outbox
-SET status = $2,
-    updated_at = NOW()
+SET status = $2
 WHERE outbox_key = $1 
   AND status != $2;
 

@@ -10,7 +10,7 @@ type Producer struct {
 	writer *kafka.Writer
 }
 
-func NewProducer(address string, topic string) *Producer {
+func NewProducer(address string) *Producer {
 	writer := &kafka.Writer{
 		Addr:         kafka.TCP(address),
 		Balancer:     &kafka.Hash{},

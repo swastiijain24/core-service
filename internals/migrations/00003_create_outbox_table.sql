@@ -1,7 +1,7 @@
 -- +goose Up
 CREATE TABLE outbox (
-    outbox_key TEXT PRIMARY KEY, -- This will be "uuid_CREDIT", "uuid_FINAL", etc.
-    transaction_id TEXT NOT NULL, -- This stays "uuid" (The original Kafka Key)
+    outbox_key TEXT PRIMARY KEY, 
+    transaction_id TEXT NOT NULL, 
     topic TEXT NOT NULL,
     payload BYTEA NOT NULL,
     status TEXT NOT NULL DEFAULT 'PENDING',

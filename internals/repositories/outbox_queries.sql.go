@@ -96,8 +96,7 @@ func (q *Queries) GetPendingOutboxEntries(ctx context.Context) ([]Outbox, error)
 
 const updateOutboxStatus = `-- name: UpdateOutboxStatus :exec
 UPDATE outbox
-SET status = $2,
-    updated_at = NOW()
+SET status = $2
 WHERE outbox_key = $1 
   AND status != $2
 `
