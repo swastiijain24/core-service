@@ -40,8 +40,10 @@ func (w *PaymentWorker) StartConsumingPaymentRequest(ctx context.Context) {
 			fmt.Println("error unpacking message:", err)
 			continue
 		}
-		log.Print("5")
-		err = w.transactionService.NewTransaction(ctx, payment.GetTransactionId(), payment.GetPayerAccountId(), payment.GetPayeeAccountId(), payment.GetAmount(), payment.GetPayerBankCode(), payment.GetPayeeBankCode())
+
+		log.Print("request received by core service")
+
+		err = w.transactionService.NewTransaction(ctx, payment.GetTransactionId(), payment.GetPayerAccountId(), payment.GetPayeeAccountId(), payment.GetAmount(), payment.GetPayerBankCode(), payment.GetPayeeBankCode(), payment.GetMpin())
 		if err != nil {
 			fmt.Println("error starting transaction:", err)
 		}
@@ -49,6 +51,6 @@ func (w *PaymentWorker) StartConsumingPaymentRequest(ctx context.Context) {
 		if err := w.paymentConsumer.Reader.CommitMessages(ctx, msg); err != nil {
 			fmt.Println("failed to commit message:", err)
 		}
-		log.Print("7")
+		
 	}
 }

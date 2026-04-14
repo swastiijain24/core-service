@@ -4,6 +4,9 @@ import (
 	"context"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/joho/godotenv"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -14,13 +17,14 @@ import (
 )
 
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	err := godotenv.Load()
 	if err != nil {
 		log.Println("No .env file found")
 	}
 
-	ctx := context.Background()
 	dsn := os.Getenv("GOOSE_DBSTRING")
 
 	pool, err := pgxpool.New(ctx, dsn)
@@ -32,24 +36,33 @@ func main() {
 	log.Printf("connected to database")
 
 	repo := repo.New(pool)
-	Producer := kafka.NewProducer("localhost:9092")
+	kafkaAddr := os.Getenv("KAFKA_ADDR")
+	Producer := kafka.NewProducer(kafkaAddr)
 
 	txnService := services.NewTransactionService(repo, pool, Producer)
 
-	bankConsumer := kafka.NewConsumer([]string {"localhost:9092"}, "bank.response.v1")
-	paymentConsumer := kafka.NewConsumer([]string {"localhost:9092"}, "payment.request.v1")
+	bankConsumer := kafka.NewConsumer([]string{kafkaAddr}, "bank.response.v1" , "core-grp-1")
+	paymentConsumer := kafka.NewConsumer([]string{kafkaAddr}, "payment.request.v1", "core-grp-2")
+
+	defer bankConsumer.Reader.Close()
+	defer paymentConsumer.Reader.Close()
 
 	paymentWorker := workers.NewPaymentWorker(paymentConsumer, txnService)
 	bankWorker := workers.NewBankWorker(bankConsumer, txnService)
-	relayWorker := workers.NewRelayWorker(repo , Producer)
+	relayWorker := workers.NewRelayWorker(repo, Producer)
+
+	reconProducer := kafka.NewProducer(kafkaAddr)
+	reconWorker := workers.NewReconWorker(repo, reconProducer)
 
 	go paymentWorker.StartConsumingPaymentRequest(ctx)
 	go bankWorker.StartConsumingBankResponse(ctx)
 	go relayWorker.StartRelayingOutboxEntries(ctx)
+	go reconWorker.StartWorker(ctx)
 
 	log.Println("Core Service is running...")
-	<-ctx.Done() 
-	log.Println("Shutting down Core Service...")
 
-	select {}
+	<-ctx.Done()
+
+	log.Println("Shutting down...")
+
 }

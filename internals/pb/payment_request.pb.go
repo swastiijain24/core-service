@@ -29,6 +29,7 @@ type PaymentRequest struct {
 	Amount         int64                  `protobuf:"varint,4,opt,name=amount,proto3" json:"amount,omitempty"`
 	PayerBankCode  string                 `protobuf:"bytes,5,opt,name=payer_bank_code,json=payerBankCode,proto3" json:"payer_bank_code,omitempty"`
 	PayeeBankCode  string                 `protobuf:"bytes,6,opt,name=payee_bank_code,json=payeeBankCode,proto3" json:"payee_bank_code,omitempty"`
+	Mpin           string                 `protobuf:"bytes,7,opt,name=mpin,proto3" json:"mpin,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -105,18 +106,26 @@ func (x *PaymentRequest) GetPayeeBankCode() string {
 	return ""
 }
 
+func (x *PaymentRequest) GetMpin() string {
+	if x != nil {
+		return x.Mpin
+	}
+	return ""
+}
+
 var File_pb_payment_request_proto protoreflect.FileDescriptor
 
 const file_pb_payment_request_proto_rawDesc = "" +
 	"\n" +
-	"\x18pb/payment_request.proto\x12\x02pb\"\xf3\x01\n" +
+	"\x18pb/payment_request.proto\x12\x02pb\"\x87\x02\n" +
 	"\x0ePaymentRequest\x12%\n" +
 	"\x0etransaction_id\x18\x01 \x01(\tR\rtransactionId\x12(\n" +
 	"\x10payer_account_id\x18\x02 \x01(\tR\x0epayerAccountId\x12(\n" +
 	"\x10payee_account_id\x18\x03 \x01(\tR\x0epayeeAccountId\x12\x16\n" +
 	"\x06amount\x18\x04 \x01(\x03R\x06amount\x12&\n" +
 	"\x0fpayer_bank_code\x18\x05 \x01(\tR\rpayerBankCode\x12&\n" +
-	"\x0fpayee_bank_code\x18\x06 \x01(\tR\rpayeeBankCodeB,Z*github.com/swastiijain24/npci-contracts/pbb\x06proto3"
+	"\x0fpayee_bank_code\x18\x06 \x01(\tR\rpayeeBankCode\x12\x12\n" +
+	"\x04mpin\x18\a \x01(\tR\x04mpinB,Z*github.com/swastiijain24/npci-contracts/pbb\x06proto3"
 
 var (
 	file_pb_payment_request_proto_rawDescOnce sync.Once

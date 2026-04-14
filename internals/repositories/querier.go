@@ -15,6 +15,7 @@ type Querier interface {
 	CreateOutboxEntry(ctx context.Context, arg CreateOutboxEntryParams) (pgconn.CommandTag, error)
 	CreateTransaction(ctx context.Context, arg CreateTransactionParams) (pgconn.CommandTag, error)
 	GetPendingOutboxEntries(ctx context.Context) ([]Outbox, error)
+	GetStuckTransactions(ctx context.Context) ([]Transaction, error)
 	GetTransaction(ctx context.Context, transactionID string) (Transaction, error)
 	IncrementRetryCount(ctx context.Context, transactionID string) error
 	UpdateCreditLeg(ctx context.Context, arg UpdateCreditLegParams) (int64, error)

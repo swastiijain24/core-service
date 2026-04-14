@@ -14,13 +14,14 @@ import (
 )
 
 type TransactionService interface {
-	NewTransaction(ctx context.Context, transactionId string, payerAccountId string, payeeAccountId string, amount int64, payerBankCode string, payeeBankCode string) error
+	NewTransaction(ctx context.Context, transactionId string, payerAccountId string, payeeAccountId string, amount int64, payerBankCode string, payeeBankCode string, mpin string) error
 	ProcessBankResponse(ctx context.Context, transactionId string, bankReferenceId string, success bool, errorMessage string, txnType string) error
-	handleCreditFailure(ctx context.Context, qtx repo.Querier, transaction repo.Transaction)
-	handleCreditSuccess(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string)
-	handleDebitFailure(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string)
-	handleDebitSuccess(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string)
-	pushToOutBox(ctx context.Context, qtx repo.Querier, outboxKey string, transactionId string, topic string, payload []byte) error 
+	handleCreditFailure(ctx context.Context, qtx repo.Querier, transaction repo.Transaction) error
+	handleCreditSuccess(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) error
+	handleDebitFailure(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) error
+	handleDebitSuccess(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) error
+	pushToOutBox(ctx context.Context, qtx repo.Querier, outboxKey string, transactionId string, topic string, payload []byte) error
+	GetStuckTransactions(ctx context.Context) ([]repo.Transaction, error)
 }
 
 type txnsvc struct {
@@ -37,7 +38,7 @@ func NewTransactionService(repo repo.Querier, db *pgxpool.Pool, bankProducer *ka
 	}
 }
 
-func (s *txnsvc) NewTransaction(ctx context.Context, transactionId string, payerAccountId string, payeeAccountId string, amount int64, payerBankCode string, payeeBankCode string) error {
+func (s *txnsvc) NewTransaction(ctx context.Context, transactionId string, payerAccountId string, payeeAccountId string, amount int64, payerBankCode string, payeeBankCode string, mpin string) error {
 	dbTx, err := s.db.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("error to begin database transaction: %w", err)
@@ -64,8 +65,12 @@ func (s *txnsvc) NewTransaction(ctx context.Context, transactionId string, payer
 		PayerAccountId: payerAccountId,
 		PayeeAccountId: payeeAccountId,
 		Amount:         amount,
-		Type:           "DEBIT",
-		BankCode:       payerBankCode,  
+		BankCode:       payerBankCode,
+		Operation: &pb.BankRequest_Debit{
+			Debit: &pb.DebitDetails{
+				Mpin: mpin,
+			},
+		},
 	}
 
 	payload, err := proto.Marshal(message)
@@ -77,10 +82,10 @@ func (s *txnsvc) NewTransaction(ctx context.Context, transactionId string, payer
 	if err != nil {
 		return fmt.Errorf("error pushing message to outbox: %w", err)
 	}
-	log.Print("6")
+	log.Print("pushed bank request to outbox")
 	dbTx.Commit(ctx)
 
-	return nil 
+	return nil
 }
 
 func (s *txnsvc) ProcessBankResponse(ctx context.Context, transactionId string, bankReferenceId string, success bool, errorMessage string, txnType string) error {
@@ -97,127 +102,197 @@ func (s *txnsvc) ProcessBankResponse(ctx context.Context, transactionId string, 
 		return fmt.Errorf("error fetching transaction: %w", err)
 	}
 
+	var processErr error
+
 	switch txnType {
 	case "DEBIT":
 		if success {
-			s.handleDebitSuccess(ctx, qtx, transaction, bankReferenceId)
+			processErr = s.handleDebitSuccess(ctx, qtx, transaction, bankReferenceId)
 		} else {
-			s.handleDebitFailure(ctx, qtx, transaction, bankReferenceId)
+			processErr = s.handleDebitFailure(ctx, qtx, transaction, bankReferenceId)
 		}
 	case "CREDIT":
-		if success {
-			s.handleCreditSuccess(ctx, qtx, transaction, bankReferenceId)
+		if transaction.Status == "REFUNDING" {
+			if success {
+				processErr = s.handleRefundSuccess(ctx, qtx, transaction)
+			} else {
+				processErr = s.handleRefundFailure(ctx, qtx, transaction)
+			}
 		} else {
-			s.handleCreditFailure(ctx, qtx, transaction)
+			if success {
+				processErr = s.handleCreditSuccess(ctx, qtx, transaction, bankReferenceId)
+			} else {
+				processErr = s.handleCreditFailure(ctx, qtx, transaction)
+			}
 		}
+	}
+	if processErr != nil {
+		return fmt.Errorf("%s", processErr)
 	}
 
 	dbTx.Commit(ctx)
 
-	return nil 
+	log.Print("handled the bank response")
+	return nil
 }
 
-func (s *txnsvc) handleDebitSuccess(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) {
-	qtx.UpdateDebitLeg(ctx, repo.UpdateDebitLegParams{
-		TransactionID:  transaction.TransactionID,
-		DebitBankRef:   utils.ToPGText(bankReferenceId),
-		Status:         "DEBIT_SUCCESS",
+func (s *txnsvc) handleDebitSuccess(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) error {
+	_, err := qtx.UpdateDebitLeg(ctx, repo.UpdateDebitLegParams{
+		TransactionID: transaction.TransactionID,
+		DebitBankRef:  utils.ToPGText(bankReferenceId),
+		Status:        "DEBIT_SUCCESS",
 	})
+	if err != nil {
+		return err
+	}
 
 	creditReq := &pb.BankRequest{
 		TransactionId:  transaction.TransactionID,
-		Type:           "CREDIT",
 		PayerAccountId: transaction.PayerAccountID,
 		PayeeAccountId: transaction.PayeeAccountID,
 		Amount:         transaction.Amount,
-		BankCode:       transaction.PayeeBankCode.String, 
+		BankCode:       transaction.PayeeBankCode.String,
+		Operation:      &pb.BankRequest_Credit{},
 	}
 
-	payload, _ := proto.Marshal(creditReq)
-	s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_CREDIT", transaction.TransactionID, "bank.instruction.v1", payload)
+	payload, err := proto.Marshal(creditReq)
+	if err != nil {
+		return err
+	}
+	return s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_CREDIT", transaction.TransactionID, "bank.instruction.v1", payload)
 }
 
-func (s *txnsvc) handleDebitFailure(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) {
-	qtx.UpdateDebitLeg(ctx, repo.UpdateDebitLegParams{
-		TransactionID:  transaction.TransactionID,
-		DebitBankRef:   utils.ToPGText(bankReferenceId),
-		Status:         "DEBIT_FAILED",
+func (s *txnsvc) handleDebitFailure(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) error {
+	_, err := qtx.UpdateDebitLeg(ctx, repo.UpdateDebitLegParams{
+		TransactionID: transaction.TransactionID,
+		DebitBankRef:  utils.ToPGText(bankReferenceId),
+		Status:        "DEBIT_FAILED",
 	})
+	if err != nil {
+		return err
+	}
 
 	finalResponse := &pb.PaymentResponse{
 		TransactionId: transaction.TransactionID,
 		Status:        "FAILED",
 	}
 
-	payload, _ := proto.Marshal(finalResponse)
-	s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_FINAL", transaction.TransactionID, "payment.response.v1", payload)
+	payload, err := proto.Marshal(finalResponse)
+	if err != nil {
+		return err
+	}
+	return s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_FINAL", transaction.TransactionID, "payment.response.v1", payload)
 }
 
-func (s *txnsvc) handleCreditSuccess(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) {
-	qtx.UpdateCreditLeg(ctx, repo.UpdateCreditLegParams{
-		TransactionID:  transaction.TransactionID,
-		CreditBankRef:  utils.ToPGText(bankReferenceId),
-		Status:         "CREDIT_SUCCESS",
+func (s *txnsvc) handleCreditSuccess(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) error {
+	_, err := qtx.UpdateCreditLeg(ctx, repo.UpdateCreditLegParams{
+		TransactionID: transaction.TransactionID,
+		CreditBankRef: utils.ToPGText(bankReferenceId),
+		Status:        "CREDIT_SUCCESS",
 	})
+	if err != nil {
+		return err
+	}
 
 	finalResponse := &pb.PaymentResponse{
 		TransactionId: transaction.TransactionID,
 		Status:        "SUCCESS",
 	}
 
-	payload, _ := proto.Marshal(finalResponse)
-	s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_FINAL", transaction.TransactionID, "payment.response.v1", payload)
+	payload, err := proto.Marshal(finalResponse)
+	if err != nil {
+		return err
+	}
+	return s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_FINAL", transaction.TransactionID, "payment.response.v1", payload)
 }
 
-func (s *txnsvc) handleCreditFailure(ctx context.Context, qtx repo.Querier, transaction repo.Transaction) {
+func (s *txnsvc) handleCreditFailure(ctx context.Context, qtx repo.Querier, transaction repo.Transaction) error {
 	if transaction.RetryCount.Int32 < 3 {
-		qtx.UpdateCreditLeg(ctx, repo.UpdateCreditLegParams{
+		_, err := qtx.UpdateCreditLeg(ctx, repo.UpdateCreditLegParams{
 			TransactionID: transaction.TransactionID,
 			Status:        "CREDIT_PENDING",
 		})
-		qtx.IncrementRetryCount(ctx, transaction.TransactionID)
+		if err != nil {
+			return err
+		}
+		err = qtx.IncrementRetryCount(ctx, transaction.TransactionID)
+
+		if err != nil {
+			return err
+		}
 
 		retryReq := &pb.BankRequest{
 			TransactionId:  transaction.TransactionID,
-			Type:           "CREDIT",
 			PayerAccountId: transaction.PayerAccountID,
 			PayeeAccountId: transaction.PayeeAccountID,
 			Amount:         transaction.Amount,
 			BankCode:       transaction.PayeeBankCode.String,
+			Operation:      &pb.BankRequest_Credit{},
 		}
 
-		payload, _ := proto.Marshal(retryReq)
+		payload, err := proto.Marshal(retryReq)
+		if err != nil {
+			return err
+		}
 		retryKey := fmt.Sprintf("%s_RETRY_%d", transaction.TransactionID, transaction.RetryCount.Int32+1)
-		s.pushToOutBox(ctx, qtx, retryKey, transaction.TransactionID, "bank.instruction.v1", payload)
-		return
+		return s.pushToOutBox(ctx, qtx, retryKey, transaction.TransactionID, "bank.instruction.v1", payload)
+
 	}
 
 	qtx.UpdateCreditLeg(ctx, repo.UpdateCreditLegParams{
 		TransactionID: transaction.TransactionID,
-		Status:        "CREDIT_FAILED",
+		Status:        "REFUNDING",
 	})
 
 	refundReq := &pb.BankRequest{
 		TransactionId:  transaction.TransactionID,
-		Type:           "CREDIT",
 		PayerAccountId: "SETTLEMENT_ACCOUNT",
 		PayeeAccountId: transaction.PayerAccountID,
 		Amount:         transaction.Amount,
-		BankCode:       transaction.PayerBankCode.String, 
+		BankCode:       transaction.PayerBankCode.String,
+		Operation:      &pb.BankRequest_Credit{},
 	}
 
-	payload, _ := proto.Marshal(refundReq)
-	err := s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_REFUND", transaction.TransactionID, "bank.instruction.v1", payload)
-
+	payload, err := proto.Marshal(refundReq)
 	if err != nil {
-        qtx.UpdateCreditLeg(ctx, repo.UpdateCreditLegParams{
-            TransactionID: transaction.TransactionID,
-            Status:        "MANUAL_INTERVENTION_REQUIRED",
-            FailureReason: utils.ToPGText("Credit failed, Refund failed to save to outbox"),
-        })
-        return
-    }
+		return err
+	}
+	return s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_REFUND", transaction.TransactionID, "bank.instruction.v1", payload)
 
+}
+
+func (s *txnsvc) handleRefundSuccess(ctx context.Context, qtx repo.Querier, transaction repo.Transaction) error {
+	_, err := qtx.UpdateDebitLeg(ctx, repo.UpdateDebitLegParams{
+		TransactionID: transaction.TransactionID,
+		Status:        "REFUNDED",
+	})
+	if err != nil {
+		return err
+	}
+
+	finalResponse := &pb.PaymentResponse{
+		TransactionId: transaction.TransactionID,
+		Status:        "FAILED",
+	}
+
+	payload, err := proto.Marshal(finalResponse)
+	if err != nil {
+		return err
+	}
+	return s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_REFUNDED", transaction.TransactionID, "payment.response.v1", payload)
+}
+
+func (s *txnsvc) handleRefundFailure(ctx context.Context, qtx repo.Querier, transaction repo.Transaction) error {
+
+	_, err := qtx.UpdateDebitLeg(ctx, repo.UpdateDebitLegParams{
+		TransactionID: transaction.TransactionID,
+		Status:        "MANUAL_INTERVENTION_REQUIRED",
+		FailureReason: utils.ToPGText("Credit failed, Refund failed to save to outbox"),
+	})
+	if err != nil {
+		return err
+	}
+	return nil 
 }
 
 func (s *txnsvc) pushToOutBox(ctx context.Context, qtx repo.Querier, outboxKey string, transactionId string, topic string, payload []byte) error {
@@ -230,5 +305,9 @@ func (s *txnsvc) pushToOutBox(ctx context.Context, qtx repo.Querier, outboxKey s
 	if err != nil {
 		return err
 	}
-	return nil 
+	return nil
+}
+
+func (s *txnsvc) GetStuckTransactions(ctx context.Context) ([]repo.Transaction, error){
+	return s.repo.GetStuckTransactions(ctx) 
 }

@@ -25,8 +25,10 @@ func NewBankWorker(bankConsumer *kafka.Consumer, transactionService services.Tra
 func (w *BankWorker) StartConsumingBankResponse(ctx context.Context) {
 
 	for {
+
 		msg, err := w.bankConsumer.Reader.FetchMessage(ctx)
 		if err!= nil{
+			log.Print("error")
 			break 
 		}
 
@@ -38,10 +40,12 @@ func (w *BankWorker) StartConsumingBankResponse(ctx context.Context) {
 			continue
 		}
 
+		log.Print("processing the bank response started")
 		err = w.transactionService.ProcessBankResponse(ctx, bankResponse.GetTransactionId(), bankResponse.GetBankReferenceId(), bankResponse.GetSuccess(), bankResponse.GetErrorMessage(), bankResponse.GetType())
 		if err != nil{
 			log.Printf("failed to process bank reponse :%v", err)
 		}
+		log.Print("processed the  bank response")
 		
 		if err := w.bankConsumer.Reader.CommitMessages(ctx, msg); err != nil {
                 log.Printf("failed to commit: %v", err)

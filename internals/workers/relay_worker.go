@@ -49,10 +49,9 @@ func (w *RelayWorker) processOutbox(ctx context.Context){
 	}
 
 	for _, entry := range entries{
-		log.Print("8")
+		log.Print("processing outbox entries")
 		err := w.producer.ProduceEvent(ctx, entry.TransactionID, entry.Payload, entry.Topic)
-		log.Print("event produced")
-		log.Print("9")
+		log.Print("bank request produced from core service")
 
 		if err != nil {
 			log.Printf("Relay: failed to publish txn %s: %v", entry.TransactionID, err)

@@ -48,6 +48,44 @@ func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionPa
 	)
 }
 
+const getStuckTransactions = `-- name: GetStuckTransactions :many
+SELECT transaction_id, payer_account_id, payee_account_id, amount, status, retry_count, debit_bank_ref, failure_reason, created_at, updated_at, credit_bank_ref, payer_bank_code, payee_bank_code FROM transactions WHERE status LIKE '%PENDING' AND updated_at < NOW() - INTERVAL '5 minutes'
+`
+
+func (q *Queries) GetStuckTransactions(ctx context.Context) ([]Transaction, error) {
+	rows, err := q.db.Query(ctx, getStuckTransactions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Transaction
+	for rows.Next() {
+		var i Transaction
+		if err := rows.Scan(
+			&i.TransactionID,
+			&i.PayerAccountID,
+			&i.PayeeAccountID,
+			&i.Amount,
+			&i.Status,
+			&i.RetryCount,
+			&i.DebitBankRef,
+			&i.FailureReason,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.CreditBankRef,
+			&i.PayerBankCode,
+			&i.PayeeBankCode,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTransaction = `-- name: GetTransaction :one
 SELECT transaction_id, payer_account_id, payee_account_id, amount, status, retry_count, debit_bank_ref, failure_reason, created_at, updated_at, credit_bank_ref, payer_bank_code, payee_bank_code FROM transactions
 WHERE transaction_id = $1 LIMIT 1
