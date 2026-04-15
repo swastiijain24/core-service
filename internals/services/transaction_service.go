@@ -20,8 +20,9 @@ type TransactionService interface {
 	handleDebitFailure(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) error
 	handleDebitSuccess(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) error
 	GetStuckTransactions(ctx context.Context) ([]repo.Transaction, error)
-	GetTransactionById(ctx context.Context, transactionId string) (repo.Transaction, error)
-	UpdateTransactionStatus(ctx context.Context, transactionId string, status string) error
+	MarkAsFailedWithOutBox(ctx context.Context, transactionId string, errorMsg string) error
+	// GetTransactionById(ctx context.Context, transactionId string) (repo.Transaction, error)
+	// UpdateTransactionStatus(ctx context.Context, transactionId string, status string) error
 }
 
 type txnsvc struct {
@@ -301,13 +302,27 @@ func (s *txnsvc) GetStuckTransactions(ctx context.Context) ([]repo.Transaction, 
 	return s.repo.GetStuckTransactions(ctx)
 }
 
-func (s *txnsvc) GetTransactionById(ctx context.Context, transactionId string) (repo.Transaction, error) {
-	return s.repo.GetTransaction(ctx, transactionId)
-}
+func (s *txnsvc) MarkAsFailedWithOutBox(ctx context.Context, transactionId string, errorMsg string) error {
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
 
-func (s *txnsvc) UpdateTransactionStatus(ctx context.Context, transactionId string, status string) error {
-	return s.repo.UpdateTransactionStatus(ctx, repo.UpdateTransactionStatusParams{
-		TransactionID: transactionId,
-		Status: status,
-	})
+	qtx := repo.New(tx)
+
+	_, err = qtx.GetTransaction(ctx, transactionId)
+	if err != nil {
+		log.Printf("Transaction %s not found. Creating placeholder outbox entry.", transactionId)
+	} else {
+		qtx.UpdateTransactionStatus(ctx, repo.UpdateTransactionStatusParams{
+			TransactionID: transactionId,
+			Status:        "FAILED",
+		})
+	}
+	s.outboxService.PushToOutbox(ctx, qtx, transactionId+"_FAILED", transactionId, "payment.response.v1", nil)
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+	return nil
 }

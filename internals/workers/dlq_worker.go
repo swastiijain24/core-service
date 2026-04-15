@@ -12,15 +12,13 @@ type DLQWorker struct {
 	producer *kafka.Producer
 	consumer *kafka.Consumer
 	transactionService services.TransactionService
-	outboxService services.OutboxService
 }
 
-func NewDLQWorker(transactionService services.TransactionService, outboxService services.OutboxService, producer *kafka.Producer, consumer *kafka.Consumer) *DLQWorker {
+func NewDLQWorker(transactionService services.TransactionService, producer *kafka.Producer, consumer *kafka.Consumer) *DLQWorker {
 	return &DLQWorker{
 		producer: producer,
 		consumer: consumer,
 		transactionService: transactionService,
-		outboxService: outboxService,
 	}
 }
 
@@ -35,10 +33,15 @@ func (w *DLQWorker) StartDLQWorker(ctx context.Context) {
 			continue
 		}
 
-		transaction, err := w.transactionService.GetTransactionById(ctx, string(msg.Key))
-		if err == nil {
-			w.transactionService.UpdateTransactionStatus(ctx, transaction.TransactionID, "FAILED")
-			w.outboxService.PushToOutbox()
+		transactionId := string(msg.Key)
+		err = w.transactionService.MarkAsFailedWithOutBox(ctx, transactionId, "system_error")
+
+		if err != nil {
+			log.Printf("Failed to resolve DLQ message for txn %s: %v", transactionId, err)
+            continue
 		}
+		if err := w.consumer.Reader.CommitMessages(ctx, msg); err != nil {
+            log.Printf("Failed to commit DLQ message: %v", err)
+        }
 	}	
 }
