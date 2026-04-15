@@ -39,8 +39,9 @@ func main() {
 	kafkaAddr := os.Getenv("KAFKA_ADDR")
 	Producer := kafka.NewProducer(kafkaAddr)
 
-	txnService := services.NewTransactionService(repo, pool, Producer)
 	outboxService := services.NewOutboxService(repo)
+	txnService := services.NewTransactionService(repo, pool, Producer, outboxService)
+	
 
 	bankConsumer := kafka.NewConsumer([]string{kafkaAddr}, "bank.response.v1" , "core-grp-1")
 	bankProducer := kafka.NewProducer(kafkaAddr)
