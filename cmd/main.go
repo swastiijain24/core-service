@@ -40,6 +40,7 @@ func main() {
 	Producer := kafka.NewProducer(kafkaAddr)
 
 	txnService := services.NewTransactionService(repo, pool, Producer)
+	outboxService := services.NewOutboxService(repo)
 
 	bankConsumer := kafka.NewConsumer([]string{kafkaAddr}, "bank.response.v1" , "core-grp-1")
 	bankProducer := kafka.NewProducer(kafkaAddr)
@@ -51,10 +52,10 @@ func main() {
 	dlqProducer := kafka.NewProducer(kafkaAddr)
 	paymentWorker := workers.NewPaymentWorker(paymentConsumer,dlqProducer, txnService)
 	bankWorker := workers.NewBankWorker(bankConsumer,bankProducer, txnService)
-	relayWorker := workers.NewRelayWorker(repo, Producer)
+	relayWorker := workers.NewRelayWorker(outboxService, Producer)
 
 	reconProducer := kafka.NewProducer(kafkaAddr)
-	reconWorker := workers.NewReconWorker(repo, reconProducer)
+	reconWorker := workers.NewReconWorker(txnService, reconProducer)
 
 	go paymentWorker.StartConsumingPaymentRequest(ctx)
 	go bankWorker.StartConsumingBankResponse(ctx)

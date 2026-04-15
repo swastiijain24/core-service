@@ -5,17 +5,17 @@ import (
 	"time"
 
 	"github.com/swastiijain24/core/internals/kafka"
-	repo "github.com/swastiijain24/core/internals/repositories"
+	"github.com/swastiijain24/core/internals/services"
 )
 
 type ReconWorker struct {
-	repo repo.Querier 
+	transactionService services.TransactionService
 	producer *kafka.Producer
 }
 
-func NewReconWorker(repo repo.Querier, producer *kafka.Producer) *ReconWorker {
+func NewReconWorker(transactionService services.TransactionService, producer *kafka.Producer) *ReconWorker {
 	return &ReconWorker{
-		repo: repo,
+		transactionService: transactionService,
 		producer: producer,
 	}
 }
@@ -25,7 +25,7 @@ func (w *ReconWorker) StartWorker(ctx context.Context) {
 	for {
 		select{
 		case <- ticker.C:
-			transactions , _ := w.repo.GetStuckTransactions(ctx)
+			transactions , _ := w.transactionService.GetStuckTransactions(ctx)
 			for _, txn := range transactions{
 				var value []byte 
 				w.producer.ProduceEvent(ctx, txn.TransactionID,value,"bank.enquiry.v1")

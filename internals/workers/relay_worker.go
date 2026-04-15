@@ -6,17 +6,17 @@ import (
 	"time"
 
 	"github.com/swastiijain24/core/internals/kafka"
-	repo "github.com/swastiijain24/core/internals/repositories"
+	"github.com/swastiijain24/core/internals/services"
 )
 
 type RelayWorker struct {
-	repo repo.Querier
+	outboxService services.OutboxService
 	producer *kafka.Producer
 }
 
-func NewRelayWorker(repo repo.Querier, producer *kafka.Producer) *RelayWorker {
+func NewRelayWorker(outboxService services.OutboxService, producer *kafka.Producer) *RelayWorker {
 	return &RelayWorker{
-		repo: repo,
+		outboxService: outboxService,
 		producer: producer,
 	}
 }
@@ -42,7 +42,7 @@ func (w *RelayWorker) StartRelayingOutboxEntries(ctx context.Context) {
 
 func (w *RelayWorker) processOutbox(ctx context.Context){
 
-	entries, err := w.repo.GetPendingOutboxEntries(ctx)
+	entries, err := w.outboxService.GetPendingOutboxEntries(ctx)
 	if err != nil {
 		log.Printf("Relay: failed to fetch outbox: %v", err)
 		return
@@ -58,10 +58,7 @@ func (w *RelayWorker) processOutbox(ctx context.Context){
 			continue 
 		}
 
-		err = w.repo.UpdateOutboxStatus(ctx, repo.UpdateOutboxStatusParams{
-			OutboxKey: entry.OutboxKey,
-			Status: "SENT",
-		})
+		err = w.outboxService.UpdateOutboxStatus(ctx,entry.OutboxKey, "SENT")
 
 		if err != nil {
 			log.Printf("Relay: failed to update status for %s: %v", entry.TransactionID, err)
@@ -78,7 +75,7 @@ func (w *RelayWorker) StartCleanupOutbox(ctx context.Context){
 		case <-ctx.Done(): 
 		return 
 		case <-ticker.C	:
-			err := w.repo.CleanupOutbox(ctx)
+			err := w.outboxService.CleanupOutbox(ctx)
 			if err != nil{
 				log.Printf("Cleanup: failed to prune outbox: %v", err)
             } else {

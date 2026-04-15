@@ -184,3 +184,20 @@ func (q *Queries) UpdateDebitLeg(ctx context.Context, arg UpdateDebitLegParams) 
 	}
 	return result.RowsAffected(), nil
 }
+
+const updateTransactionStatus = `-- name: UpdateTransactionStatus :exec
+UPDATE transactions 
+SET
+    status = $2
+WHERE transaction_id = $1
+`
+
+type UpdateTransactionStatusParams struct {
+	TransactionID string `json:"transaction_id"`
+	Status        string `json:"status"`
+}
+
+func (q *Queries) UpdateTransactionStatus(ctx context.Context, arg UpdateTransactionStatusParams) error {
+	_, err := q.db.Exec(ctx, updateTransactionStatus, arg.TransactionID, arg.Status)
+	return err
+}

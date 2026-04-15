@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/swastiijain24/core/internals/kafka"
 	pb "github.com/swastiijain24/core/internals/pb"
@@ -20,21 +19,24 @@ type TransactionService interface {
 	handleCreditSuccess(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) error
 	handleDebitFailure(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) error
 	handleDebitSuccess(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) error
-	pushToOutBox(ctx context.Context, qtx repo.Querier, outboxKey string, transactionId string, topic string, payload []byte) error
 	GetStuckTransactions(ctx context.Context) ([]repo.Transaction, error)
+	GetTransactionById(ctx context.Context, transactionId string) (repo.Transaction, error)
+	UpdateTransactionStatus(ctx context.Context, transactionId string, status string) error
 }
 
 type txnsvc struct {
-	db           *pgxpool.Pool
-	repo         repo.Querier
-	bankProducer *kafka.Producer
+	db            *pgxpool.Pool
+	repo          repo.Querier
+	bankProducer  *kafka.Producer
+	outboxService OutboxService
 }
 
-func NewTransactionService(repo repo.Querier, db *pgxpool.Pool, bankProducer *kafka.Producer) TransactionService {
+func NewTransactionService(repo repo.Querier, db *pgxpool.Pool, bankProducer *kafka.Producer, outboxService OutboxService) TransactionService {
 	return &txnsvc{
-		db:           db,
-		repo:         repo,
-		bankProducer: bankProducer,
+		db:            db,
+		repo:          repo,
+		bankProducer:  bankProducer,
+		outboxService: outboxService,
 	}
 }
 
@@ -78,7 +80,7 @@ func (s *txnsvc) NewTransaction(ctx context.Context, transactionId string, payer
 		return fmt.Errorf("error packing message: %w", err)
 	}
 
-	err = s.pushToOutBox(ctx, qtx, transactionId, transactionId, "bank.instruction.v1", payload)
+	err = s.outboxService.PushToOutbox(ctx, qtx, transactionId, transactionId, "bank.instruction.v1", payload)
 	if err != nil {
 		return fmt.Errorf("error pushing message to outbox: %w", err)
 	}
@@ -159,7 +161,7 @@ func (s *txnsvc) handleDebitSuccess(ctx context.Context, qtx repo.Querier, trans
 	if err != nil {
 		return err
 	}
-	return s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_CREDIT", transaction.TransactionID, "bank.instruction.v1", payload)
+	return s.outboxService.PushToOutbox(ctx, qtx, transaction.TransactionID+"_CREDIT", transaction.TransactionID, "bank.instruction.v1", payload)
 }
 
 func (s *txnsvc) handleDebitFailure(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) error {
@@ -181,7 +183,7 @@ func (s *txnsvc) handleDebitFailure(ctx context.Context, qtx repo.Querier, trans
 	if err != nil {
 		return err
 	}
-	return s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_FINAL", transaction.TransactionID, "payment.response.v1", payload)
+	return s.outboxService.PushToOutbox(ctx, qtx, transaction.TransactionID+"_FINAL", transaction.TransactionID, "payment.response.v1", payload)
 }
 
 func (s *txnsvc) handleCreditSuccess(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) error {
@@ -203,7 +205,7 @@ func (s *txnsvc) handleCreditSuccess(ctx context.Context, qtx repo.Querier, tran
 	if err != nil {
 		return err
 	}
-	return s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_FINAL", transaction.TransactionID, "payment.response.v1", payload)
+	return s.outboxService.PushToOutbox(ctx, qtx, transaction.TransactionID+"_FINAL", transaction.TransactionID, "payment.response.v1", payload)
 }
 
 func (s *txnsvc) handleCreditFailure(ctx context.Context, qtx repo.Querier, transaction repo.Transaction) error {
@@ -235,7 +237,7 @@ func (s *txnsvc) handleCreditFailure(ctx context.Context, qtx repo.Querier, tran
 			return err
 		}
 		retryKey := fmt.Sprintf("%s_RETRY_%d", transaction.TransactionID, transaction.RetryCount.Int32+1)
-		return s.pushToOutBox(ctx, qtx, retryKey, transaction.TransactionID, "bank.instruction.v1", payload)
+		return s.outboxService.PushToOutbox(ctx, qtx, retryKey, transaction.TransactionID, "bank.instruction.v1", payload)
 
 	}
 
@@ -257,7 +259,7 @@ func (s *txnsvc) handleCreditFailure(ctx context.Context, qtx repo.Querier, tran
 	if err != nil {
 		return err
 	}
-	return s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_REFUND", transaction.TransactionID, "bank.instruction.v1", payload)
+	return s.outboxService.PushToOutbox(ctx, qtx, transaction.TransactionID+"_REFUND", transaction.TransactionID, "bank.instruction.v1", payload)
 
 }
 
@@ -279,7 +281,7 @@ func (s *txnsvc) handleRefundSuccess(ctx context.Context, qtx repo.Querier, tran
 	if err != nil {
 		return err
 	}
-	return s.pushToOutBox(ctx, qtx, transaction.TransactionID+"_REFUNDED", transaction.TransactionID, "payment.response.v1", payload)
+	return s.outboxService.PushToOutbox(ctx, qtx, transaction.TransactionID+"_REFUNDED", transaction.TransactionID, "payment.response.v1", payload)
 }
 
 func (s *txnsvc) handleRefundFailure(ctx context.Context, qtx repo.Querier, transaction repo.Transaction) error {
@@ -292,22 +294,20 @@ func (s *txnsvc) handleRefundFailure(ctx context.Context, qtx repo.Querier, tran
 	if err != nil {
 		return err
 	}
-	return nil 
-}
-
-func (s *txnsvc) pushToOutBox(ctx context.Context, qtx repo.Querier, outboxKey string, transactionId string, topic string, payload []byte) error {
-	_, err := qtx.CreateOutboxEntry(ctx, repo.CreateOutboxEntryParams{
-		OutboxKey:     outboxKey,
-		TransactionID: transactionId,
-		Topic:         topic,
-		Payload:       payload,
-	})
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
-func (s *txnsvc) GetStuckTransactions(ctx context.Context) ([]repo.Transaction, error){
-	return s.repo.GetStuckTransactions(ctx) 
+func (s *txnsvc) GetStuckTransactions(ctx context.Context) ([]repo.Transaction, error) {
+	return s.repo.GetStuckTransactions(ctx)
+}
+
+func (s *txnsvc) GetTransactionById(ctx context.Context, transactionId string) (repo.Transaction, error) {
+	return s.repo.GetTransaction(ctx, transactionId)
+}
+
+func (s *txnsvc) UpdateTransactionStatus(ctx context.Context, transactionId string, status string) error {
+	return s.repo.UpdateTransactionStatus(ctx, repo.UpdateTransactionStatusParams{
+		TransactionID: transactionId,
+		Status: status,
+	})
 }

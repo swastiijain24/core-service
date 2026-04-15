@@ -21,6 +21,7 @@ type Querier interface {
 	UpdateCreditLeg(ctx context.Context, arg UpdateCreditLegParams) (int64, error)
 	UpdateDebitLeg(ctx context.Context, arg UpdateDebitLegParams) (int64, error)
 	UpdateOutboxStatus(ctx context.Context, arg UpdateOutboxStatusParams) error
+	UpdateTransactionStatus(ctx context.Context, arg UpdateTransactionStatusParams) error
 }
 
 var _ Querier = (*Queries)(nil)

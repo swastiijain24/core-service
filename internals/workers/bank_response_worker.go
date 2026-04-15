@@ -51,6 +51,7 @@ func (w *BankWorker) StartConsumingBankResponse(ctx context.Context) {
 		}
 
 		log.Print("processing the bank response started")
+		
 		err = w.transactionService.ProcessBankResponse(ctx, bankResponse.GetTransactionId(), bankResponse.GetBankReferenceId(), bankResponse.GetSuccess(), bankResponse.GetErrorMessage(), bankResponse.GetType())
 		if err != nil {
 			log.Printf("failed to process bank reponse :%v", err)
@@ -72,7 +73,8 @@ func (w *BankWorker) StartConsumingBankResponse(ctx context.Context) {
 }
 
 func (w *BankWorker) moveToDLQ(ctx context.Context, msg Kafka.Message, reason string) {
-	log.Printf("Moving message %s to DLQ. Reason: %s", string(msg.Key), reason)
+	log.Printf("%s failed due to Reason: %s", string(msg.Key), reason)
+	
 	err := w.dlqProducer.ProduceEvent(ctx, string(msg.Key), msg.Value, "bank.response.failed")
 	if err != nil {
 		log.Fatalf("Critical Failure: Cannot write to DLQ: %v", err)
