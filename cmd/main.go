@@ -48,7 +48,8 @@ func main() {
 	defer bankConsumer.Reader.Close()
 	defer paymentConsumer.Reader.Close()
 
-	paymentWorker := workers.NewPaymentWorker(paymentConsumer, txnService)
+	dlqProducer := kafka.NewProducer(kafkaAddr)
+	paymentWorker := workers.NewPaymentWorker(paymentConsumer,dlqProducer, txnService)
 	bankWorker := workers.NewBankWorker(bankConsumer,bankProducer, txnService)
 	relayWorker := workers.NewRelayWorker(repo, Producer)
 

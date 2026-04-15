@@ -16,14 +16,14 @@ import (
 
 type BankWorker struct {
 	bankConsumer       *kafka.Consumer
-	bankProducer       *kafka.Producer
+	dlqProducer       *kafka.Producer
 	transactionService services.TransactionService
 }
 
-func NewBankWorker(bankConsumer *kafka.Consumer, bankProducer *kafka.Producer, transactionService services.TransactionService) *BankWorker {
+func NewBankWorker(bankConsumer *kafka.Consumer, dlqProducer *kafka.Producer, transactionService services.TransactionService) *BankWorker {
 	return &BankWorker{
 		bankConsumer:       bankConsumer,
-		bankProducer: bankProducer,
+		dlqProducer: dlqProducer,
 		transactionService: transactionService,
 	}
 }
@@ -37,6 +37,7 @@ func (w *BankWorker) StartConsumingBankResponse(ctx context.Context) {
 			if ctx.Err() != nil {
 				return
 			}
+			log.Printf("fetch error: %v", err)
 			continue
 		}
 
@@ -72,7 +73,7 @@ func (w *BankWorker) StartConsumingBankResponse(ctx context.Context) {
 
 func (w *BankWorker) moveToDLQ(ctx context.Context, msg Kafka.Message, reason string) {
 	log.Printf("Moving message %s to DLQ. Reason: %s", string(msg.Key), reason)
-	err := w.bankProducer.ProduceEvent(ctx, string(msg.Key), msg.Value, "bank.response.failed")
+	err := w.dlqProducer.ProduceEvent(ctx, string(msg.Key), msg.Value, "bank.response.failed")
 	if err != nil {
 		log.Fatalf("Critical Failure: Cannot write to DLQ: %v", err)
 	}
