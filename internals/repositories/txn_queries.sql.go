@@ -88,7 +88,8 @@ func (q *Queries) GetStuckTransactions(ctx context.Context) ([]Transaction, erro
 
 const getTransaction = `-- name: GetTransaction :one
 SELECT transaction_id, payer_account_id, payee_account_id, amount, status, retry_count, debit_bank_ref, failure_reason, created_at, updated_at, credit_bank_ref, payer_bank_code, payee_bank_code FROM transactions
-WHERE transaction_id = $1 LIMIT 1
+WHERE transaction_id = $1 
+FOR UPDATE
 `
 
 func (q *Queries) GetTransaction(ctx context.Context, transactionID string) (Transaction, error) {

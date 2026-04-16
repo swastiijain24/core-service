@@ -38,7 +38,8 @@ WHERE transaction_id = $1;
 
 -- name: GetTransaction :one
 SELECT * FROM transactions
-WHERE transaction_id = $1 LIMIT 1;
+WHERE transaction_id = $1 
+FOR UPDATE;
 
 -- name: GetStuckTransactions :many
 SELECT * FROM transactions WHERE status LIKE '%PENDING' AND updated_at < NOW() - INTERVAL '5 minutes';
