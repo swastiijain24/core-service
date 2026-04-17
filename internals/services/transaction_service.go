@@ -249,11 +249,11 @@ func (s *txnsvc) handleCreditFailure(ctx context.Context, qtx repo.Querier, tran
 
 	refundReq := &pb.BankRequest{
 		TransactionId:  transaction.TransactionID,
-		PayerAccountId: "SETTLEMENT_ACCOUNT",
+		PayerAccountId: transaction.PayeeAccountID,
 		PayeeAccountId: transaction.PayerAccountID,
 		Amount:         transaction.Amount,
 		BankCode:       transaction.PayerBankCode.String,
-		Operation:      &pb.BankRequest_Credit{},
+		Operation:      &pb.BankRequest_Refund{},
 	}
 
 	payload, err := proto.Marshal(refundReq)
