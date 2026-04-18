@@ -1,11 +1,11 @@
 -- +goose Up
 CREATE TABLE IF NOT EXISTS transactions (
-    transaction_id VARCHAR(50) PRIMARY KEY, 
-    payer_account_id VARCHAR(50) NOT NULL,
-    payee_account_id VARCHAR(50) NOT NULL,
+    transaction_id VARCHAR(100) PRIMARY KEY, 
+    payer_account_id VARCHAR(100) NOT NULL,
+    payee_account_id VARCHAR(100) NOT NULL,
     amount BIGINT NOT NULL,       
     
-    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
     
     retry_count INTEGER DEFAULT 0,
     

@@ -54,7 +54,7 @@ func (w *BankWorker) StartConsumingBankResponse(ctx context.Context) {
 		
 		err = w.transactionService.ProcessBankResponse(ctx, bankResponse.GetTransactionId(), bankResponse.GetBankReferenceId(), bankResponse.GetSuccess(), bankResponse.GetErrorMessage(), bankResponse.GetType())
 		if err != nil {
-			log.Printf("failed to process bank reponse :%v", err)
+			log.Printf("failed to process bank response :%v", err)
 
 			if isPermanentError(err) {
 				w.moveToDLQ(ctx, msg, err.Error())
@@ -63,8 +63,8 @@ func (w *BankWorker) StartConsumingBankResponse(ctx context.Context) {
 
 			continue
 		}
-		log.Print("processed the  bank response")
-
+		log.Print("processed the bank response 18")
+		log.Print("processed the bank response 26")
 		if err := w.bankConsumer.Reader.CommitMessages(ctx, msg); err != nil {
 			log.Printf("failed to commit: %v", err)
 		}

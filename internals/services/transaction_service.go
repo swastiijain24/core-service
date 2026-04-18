@@ -89,7 +89,7 @@ func (s *txnsvc) NewTransaction(ctx context.Context, transactionId string, payer
 	if err != nil {
 		return fmt.Errorf("error pushing message to outbox: %w", err)
 	}
-	log.Print("pushed bank request to outbox")
+	log.Print("pushed bank request to outbox 6")
 	dbTx.Commit(ctx)
 
 	return nil
@@ -113,12 +113,14 @@ func (s *txnsvc) ProcessBankResponse(ctx context.Context, transactionId string, 
 
 	switch txnType {
 	case "DEBIT":
+		log.Print("debit done 15")
 		if success {
 			processErr = s.handleDebitSuccess(ctx, qtx, transaction, bankReferenceId)
 		} else {
 			processErr = s.handleDebitFailure(ctx, qtx, transaction, bankReferenceId)
 		}
 	case "CREDIT":
+		log.Print("credit done 24")
 		if success {
 			processErr = s.handleCreditSuccess(ctx, qtx, transaction, bankReferenceId)
 		} else {
@@ -139,7 +141,7 @@ func (s *txnsvc) ProcessBankResponse(ctx context.Context, transactionId string, 
 
 	dbTx.Commit(ctx)
 
-	log.Print("handled the bank response")
+	log.Print("handled the bank response 17")
 	return nil
 }
 
@@ -166,6 +168,7 @@ func (s *txnsvc) handleDebitSuccess(ctx context.Context, qtx repo.Querier, trans
 	if err != nil {
 		return err
 	}
+	log.Print("16")
 	return s.outboxService.PushToOutbox(ctx, qtx, transaction.TransactionID+"_CREDIT", transaction.TransactionID, "bank.instruction.v1", payload)
 }
 
@@ -211,6 +214,8 @@ func (s *txnsvc) handleCreditSuccess(ctx context.Context, qtx repo.Querier, tran
 	if err != nil {
 		return err
 	}
+
+	log.Print("credit success 25")
 	return s.outboxService.PushToOutbox(ctx, qtx, transaction.TransactionID+"_FINAL", transaction.TransactionID, "payment.response.v1", payload)
 }
 

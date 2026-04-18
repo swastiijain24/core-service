@@ -45,7 +45,7 @@ func (w *PaymentWorker) StartConsumingPaymentRequest(ctx context.Context) {
 			w.moveToDLQ(ctx, msg, "unmarshal error")
 			continue
 		}
-		log.Print("request received by core service")
+		log.Print("request received by core service 5")
 
 		err = w.transactionService.NewTransaction(ctx, payment.GetTransactionId(), payment.GetPayerAccountId(), payment.GetPayeeAccountId(), payment.GetAmount(), payment.GetPayerBankCode(), payment.GetPayeeBankCode(), payment.GetMpin())
 		if err != nil {
