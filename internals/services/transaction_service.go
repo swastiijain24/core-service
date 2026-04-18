@@ -3,13 +3,14 @@ package services
 import (
 	"context"
 	"fmt"
+	"log"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/swastiijain24/core/internals/kafka"
 	pb "github.com/swastiijain24/core/internals/pb"
 	repo "github.com/swastiijain24/core/internals/repositories"
 	"github.com/swastiijain24/core/internals/utils"
 	"google.golang.org/protobuf/proto"
-	"log"
 )
 
 type TransactionService interface {
@@ -50,7 +51,7 @@ func (s *txnsvc) NewTransaction(ctx context.Context, transactionId string, payer
 
 	qtx := repo.New(dbTx)
 
-	_, err = qtx.CreateTransaction(ctx, repo.CreateTransactionParams{
+	result, err := qtx.CreateTransaction(ctx, repo.CreateTransactionParams{
 		TransactionID:  transactionId,
 		PayerAccountID: payerAccountId,
 		PayeeAccountID: payeeAccountId,
@@ -61,6 +62,9 @@ func (s *txnsvc) NewTransaction(ctx context.Context, transactionId string, payer
 	})
 	if err != nil {
 		return fmt.Errorf("error creating transaction: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("transaction already exists")
 	}
 
 	message := &pb.BankRequest{
@@ -126,6 +130,8 @@ func (s *txnsvc) ProcessBankResponse(ctx context.Context, transactionId string, 
 		} else {
 			processErr = s.handleRefundFailure(ctx, qtx, transaction)
 		}
+	default:
+		return fmt.Errorf("unknown txn type: %s", txnType)
 	}
 	if processErr != nil {
 		return fmt.Errorf("%s", processErr)
@@ -176,6 +182,7 @@ func (s *txnsvc) handleDebitFailure(ctx context.Context, qtx repo.Querier, trans
 	finalResponse := &pb.PaymentResponse{
 		TransactionId: transaction.TransactionID,
 		Status:        "FAILED",
+		FailureReason: "debit_failed",
 	}
 
 	payload, err := proto.Marshal(finalResponse)
@@ -240,10 +247,13 @@ func (s *txnsvc) handleCreditFailure(ctx context.Context, qtx repo.Querier, tran
 
 	}
 
-	qtx.UpdateCreditLeg(ctx, repo.UpdateCreditLegParams{
+	_, err := qtx.UpdateCreditLeg(ctx, repo.UpdateCreditLegParams{
 		TransactionID: transaction.TransactionID,
 		Status:        "REFUNDING",
-	})
+	}) 
+	if err != nil {
+		return err 
+	}
 
 	refundReq := &pb.BankRequest{
 		TransactionId:  transaction.TransactionID,
@@ -271,12 +281,10 @@ func (s *txnsvc) handleRefundSuccess(ctx context.Context, qtx repo.Querier, tran
 		return err
 	}
 
-	finalResponse := &pb.PaymentResponse{
+	payload, err := proto.Marshal(&pb.PaymentResponse{
 		TransactionId: transaction.TransactionID,
 		Status:        "FAILED",
-	}
-
-	payload, err := proto.Marshal(finalResponse)
+	})
 	if err != nil {
 		return err
 	}
@@ -288,7 +296,7 @@ func (s *txnsvc) handleRefundFailure(ctx context.Context, qtx repo.Querier, tran
 	_, err := qtx.UpdateDebitLeg(ctx, repo.UpdateDebitLegParams{
 		TransactionID: transaction.TransactionID,
 		Status:        "MANUAL_INTERVENTION_REQUIRED",
-		FailureReason: utils.ToPGText("Credit failed, Refund failed to save to outbox"),
+		FailureReason: utils.ToPGText("Credit failed after retries, refund also failed — manual intervention required"),
 	})
 	if err != nil {
 		return err
@@ -318,7 +326,17 @@ func (s *txnsvc) MarkAsFailedWithOutBox(ctx context.Context, transactionId strin
 			Status:        "FAILED",
 		})
 	}
-	s.outboxService.PushToOutbox(ctx, qtx, transactionId+"_FAILED", transactionId, "payment.response.v1", nil)
+
+	payload, err := proto.Marshal(&pb.PaymentResponse{
+		TransactionId: transactionId,
+		Status:        "FAILED",
+		FailureReason: errorMsg,
+	})
+	if err != nil {
+		return err
+	}
+
+	s.outboxService.PushToOutbox(ctx, qtx, transactionId+"_FAILED", transactionId, "payment.response.v1", payload)
 	if err := tx.Commit(ctx); err != nil {
 		return err
 	}

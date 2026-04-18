@@ -13,6 +13,7 @@ func NewConsumer(brokers []string, topic string, groupId string) *Consumer {
 		Brokers: brokers,
 		Topic:   topic,
 		GroupID: groupId,
+		CommitInterval : 0,
 	})
 
 	return &Consumer{
