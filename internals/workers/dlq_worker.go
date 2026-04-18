@@ -9,14 +9,12 @@ import (
 )
 
 type DLQWorker struct {
-	producer *kafka.Producer
 	consumer *kafka.Consumer
 	transactionService services.TransactionService
 }
 
-func NewDLQWorker(transactionService services.TransactionService, producer *kafka.Producer, consumer *kafka.Consumer) *DLQWorker {
+func NewDLQWorker(transactionService services.TransactionService,  consumer *kafka.Consumer) *DLQWorker {
 	return &DLQWorker{
-		producer: producer,
 		consumer: consumer,
 		transactionService: transactionService,
 	}

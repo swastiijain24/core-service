@@ -25,10 +25,18 @@ func (w *ReconWorker) StartWorker(ctx context.Context) {
 	for {
 		select{
 		case <- ticker.C:
-			transactions , _ := w.transactionService.GetStuckTransactions(ctx)
+			transactions, _ := w.transactionService.GetStuckTransactions(ctx)
 			for _, txn := range transactions{
-				var value []byte 
-				w.producer.ProduceEvent(ctx, txn.TransactionID,value,"bank.enquiry.v1")
+				var txnType string 
+				switch txn.Status{
+				case "DEBIT_PENDING":
+					txnType = "DEBIT"
+				case "CREDIT_PENDING":
+					txnType = "CREDIT"
+				case "REFUNDING":
+					txnType = "REFUND"
+				}
+				w.producer.ProduceEvent(ctx, txn.TransactionID ,[]byte(txnType) ,"bank.enquiry.v1")
 			}
 		case <- ctx.Done():
 			return 

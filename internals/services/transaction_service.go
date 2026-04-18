@@ -3,13 +3,13 @@ package services
 import (
 	"context"
 	"fmt"
-	"log"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/swastiijain24/core/internals/kafka"
 	pb "github.com/swastiijain24/core/internals/pb"
 	repo "github.com/swastiijain24/core/internals/repositories"
 	"github.com/swastiijain24/core/internals/utils"
 	"google.golang.org/protobuf/proto"
+	"log"
 )
 
 type TransactionService interface {
@@ -19,10 +19,10 @@ type TransactionService interface {
 	handleCreditSuccess(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) error
 	handleDebitFailure(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) error
 	handleDebitSuccess(ctx context.Context, qtx repo.Querier, transaction repo.Transaction, bankReferenceId string) error
+	handleRefundSuccess(ctx context.Context, qtx repo.Querier, transaction repo.Transaction) error
+	handleRefundFailure(ctx context.Context, qtx repo.Querier, transaction repo.Transaction) error
 	GetStuckTransactions(ctx context.Context) ([]repo.Transaction, error)
 	MarkAsFailedWithOutBox(ctx context.Context, transactionId string, errorMsg string) error
-	// GetTransactionById(ctx context.Context, transactionId string) (repo.Transaction, error)
-	// UpdateTransactionStatus(ctx context.Context, transactionId string, status string) error
 }
 
 type txnsvc struct {
@@ -115,18 +115,16 @@ func (s *txnsvc) ProcessBankResponse(ctx context.Context, transactionId string, 
 			processErr = s.handleDebitFailure(ctx, qtx, transaction, bankReferenceId)
 		}
 	case "CREDIT":
-		if transaction.Status == "REFUNDING" {
-			if success {
-				processErr = s.handleRefundSuccess(ctx, qtx, transaction)
-			} else {
-				processErr = s.handleRefundFailure(ctx, qtx, transaction)
-			}
+		if success {
+			processErr = s.handleCreditSuccess(ctx, qtx, transaction, bankReferenceId)
 		} else {
-			if success {
-				processErr = s.handleCreditSuccess(ctx, qtx, transaction, bankReferenceId)
-			} else {
-				processErr = s.handleCreditFailure(ctx, qtx, transaction)
-			}
+			processErr = s.handleCreditFailure(ctx, qtx, transaction)
+		}
+	case "REFUND":
+		if success {
+			processErr = s.handleRefundSuccess(ctx, qtx, transaction)
+		} else {
+			processErr = s.handleRefundFailure(ctx, qtx, transaction)
 		}
 	}
 	if processErr != nil {
@@ -143,7 +141,7 @@ func (s *txnsvc) handleDebitSuccess(ctx context.Context, qtx repo.Querier, trans
 	_, err := qtx.UpdateDebitLeg(ctx, repo.UpdateDebitLegParams{
 		TransactionID: transaction.TransactionID,
 		DebitBankRef:  utils.ToPGText(bankReferenceId),
-		Status:        "DEBIT_SUCCESS",
+		Status:        "CREDIT_PENDING",
 	})
 	if err != nil {
 		return err

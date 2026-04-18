@@ -49,7 +49,10 @@ func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionPa
 }
 
 const getStuckTransactions = `-- name: GetStuckTransactions :many
-SELECT transaction_id, payer_account_id, payee_account_id, amount, status, retry_count, debit_bank_ref, failure_reason, created_at, updated_at, credit_bank_ref, payer_bank_code, payee_bank_code FROM transactions WHERE status LIKE '%PENDING' AND updated_at < NOW() - INTERVAL '5 minutes'
+SELECT transaction_id, payer_account_id, payee_account_id, amount, status, retry_count, debit_bank_ref, failure_reason, created_at, updated_at, credit_bank_ref, payer_bank_code, payee_bank_code FROM transactions 
+WHERE (status LIKE '%PENDING' OR status = 'REFUNDING') 
+  AND updated_at < NOW() - INTERVAL '5 minutes'
+LIMIT 200
 `
 
 func (q *Queries) GetStuckTransactions(ctx context.Context) ([]Transaction, error) {

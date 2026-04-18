@@ -42,7 +42,10 @@ WHERE transaction_id = $1
 FOR UPDATE;
 
 -- name: GetStuckTransactions :many
-SELECT * FROM transactions WHERE status LIKE '%PENDING' AND updated_at < NOW() - INTERVAL '5 minutes';
+SELECT * FROM transactions 
+WHERE (status LIKE '%PENDING' OR status = 'REFUNDING') 
+  AND updated_at < NOW() - INTERVAL '5 minutes'
+LIMIT 200;
 
 -- name: UpdateTransactionStatus :exec
 UPDATE transactions 

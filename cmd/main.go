@@ -51,9 +51,11 @@ func main() {
 	defer paymentConsumer.Reader.Close()
 
 	dlqProducer := kafka.NewProducer(kafkaAddr)
+	dlqConsumer := kafka.NewConsumer([]string{kafkaAddr}, "bank.response.failed", "failed-grp")
 	paymentWorker := workers.NewPaymentWorker(paymentConsumer,dlqProducer, txnService)
 	bankWorker := workers.NewBankWorker(bankConsumer,bankProducer, txnService)
 	relayWorker := workers.NewRelayWorker(outboxService, Producer)
+	dlqWorker := workers.NewDLQWorker(txnService, dlqConsumer)
 
 	reconProducer := kafka.NewProducer(kafkaAddr)
 	reconWorker := workers.NewReconWorker(txnService, reconProducer)
@@ -62,6 +64,7 @@ func main() {
 	go bankWorker.StartConsumingBankResponse(ctx)
 	go relayWorker.StartRelayingOutboxEntries(ctx)
 	go reconWorker.StartWorker(ctx)
+	go dlqWorker.StartDLQWorker(ctx)
 
 	log.Println("Core Service is running...")
 
