@@ -90,7 +90,10 @@ func (s *txnsvc) NewTransaction(ctx context.Context, transactionId string, payer
 		return fmt.Errorf("error pushing message to outbox: %w", err)
 	}
 	log.Print("pushed bank request to outbox 6")
-	dbTx.Commit(ctx)
+	err = dbTx.Commit(ctx)
+	if err != nil {
+		return err 
+	}
 
 	return nil
 }
@@ -139,7 +142,10 @@ func (s *txnsvc) ProcessBankResponse(ctx context.Context, transactionId string, 
 		return fmt.Errorf("%s", processErr)
 	}
 
-	dbTx.Commit(ctx)
+	err = dbTx.Commit(ctx)
+	if err != nil {
+		return err 
+	}
 
 	log.Print("handled the bank response 17")
 	return nil
@@ -341,7 +347,7 @@ func (s *txnsvc) MarkAsFailedWithOutBox(ctx context.Context, transactionId strin
 		return err
 	}
 
-	s.outboxService.PushToOutbox(ctx, qtx, transactionId+"_FAILED", transactionId, "payment.response.v1", payload)
+	err = s.outboxService.PushToOutbox(ctx, qtx, transactionId+"_FAILED", transactionId, "payment.response.v1", payload)
 	if err := tx.Commit(ctx); err != nil {
 		return err
 	}
