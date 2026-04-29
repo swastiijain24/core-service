@@ -25,7 +25,6 @@ This service models the **core transaction routing and state management** of a r
 
 ### 3. Fault Tolerance & Dead Letter Queue (DLQ)
 * Routes permanently poisoned or structurally invalid messages (e.g., malformed Protobufs, invalid UUIDs) to a DLQ topic.
-* Defers to Kafka offset retention for transient network errors.
 
 ### 4. System Reconciliation
 * Scans the database for transactions that have been stuck in a pending state beyond a designated timeout.
@@ -57,8 +56,6 @@ The Core Service:
 ### Outbox Polling with Row-Level Locks
 * Uses `FOR UPDATE SKIP LOCKED` in PostgreSQL. This allows multiple `RelayWorker` instances to run concurrently without processing the same outbox messages.
 
-### Compensation over Distributed Locks
-* Avoids distributed locking (like two-phase commit) in favor of eventual consistency. Errors result in explicit compensation flows (Refunds).
 
 ---
 
